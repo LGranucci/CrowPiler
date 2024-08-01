@@ -243,10 +243,10 @@ void write_asm(keyword* root){
         return;
     }
     //this writes .global _<function name>
-    outFile<<" .global _" << root->isFunction.name<<endl;
+    outFile<<" .global " << root->isFunction.name<<endl;
     //outFile<<".text"<<endl;
     //outFile<<".global start"<<endl;
-    outFile<<"_"<<root->isFunction.name<<":"<<endl;
+    outFile<<root->isFunction.name<<":"<<endl;
 
     int indent = 1;
     write_statement(root->isFunction.statement, indent, outFile);
@@ -273,6 +273,7 @@ int main(int argc, char *argv[]){
     }
     keyword* root = parse(tokenList);
     write_asm(root);
+    system("g++ out.s -o out");
     return 0;
 }
 
