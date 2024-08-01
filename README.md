@@ -7,6 +7,6 @@ Very incomplete at the moment.
 
 ## How to use
 use 
-> make 
+`make` 
 then 
->./lexer <fileYouWantToCompile>
+`./lexer <fileYouWantToCompile>`
