@@ -253,13 +253,13 @@ void write_asm(keyword* root){
 }
 
 int main(int argc, char *argv[]){
-    /*
+    
     if (argc != 2) {
         std::cerr << "Usage: " << argv[0] << " <filename>" << std::endl;
         return EXIT_FAILURE;
     }
-    */
-    std::ifstream myread(/*argv[1]*/"test1.txt");
+    
+    std::ifstream myread(argv[1]);
     if (!myread.is_open()) {
         std::cerr << "Error opening file: " << argv[1] << std::endl;
         return EXIT_FAILURE;
