@@ -1,4 +1,5 @@
  .global main
 main:
- movq $6, %rax
- ret
+movq $0, %rax
+not %rax
+ret

@@ -144,7 +144,12 @@ expression* parse_expression(vector<string> tokenList, int& startIndex){
         return newExpr;
     }
 }
-
+/**
+ * @brief parses a statement, which (for now) can only be of type `return <operation>`
+ * @param tokenList list of tokens that the lexer produced
+ * @param startIndex index that indicates where to start accessing the vector from
+ * 
+ */
 keyword* parse_statement(vector<string> tokenList, int& startIndex){
     if(tokenList.size()  <= (startIndex + 2)){
         return nullptr;
@@ -218,22 +223,37 @@ void generate_indent(int indent, ofstream& outFile){
         outFile<<" ";
     }
 }
+void write_expression(expression* exp, ofstream& outFile){
+    if(exp->opOrInt){
+        outFile<<"movq $" << exp->value->val<<", %rax"<<endl;
+        return;
+    }
 
+    write_expression(exp->next_exp, outFile);
+    if(exp->op == '-'){
+        outFile<<"neg %rax"<<endl;    
+    }
+    if(exp->op == '!'){
+        outFile<<"cmpq $0, %rax"<<endl;
+        outFile<<"movq $0, %rax"<<endl;
+        outFile<<"sete \%al"<<endl;
+    }
+    if(exp->op == '~'){
+        outFile<<"not %rax"<<endl;
+    }
+    
+}
 void write_statement(keyword* stat, int indent, ofstream& outFile){
     if(!stat || !stat->isReturn.active){
         return;
     }
-    generate_indent(indent, outFile);
-    outFile<<"movq $" << stat->isReturn.exp->value->val<<", %rax"<<endl;
-    generate_indent(indent, outFile);
-    outFile<<"ret"<<endl;
+    write_expression(stat->isReturn.exp, outFile);
 }
 
 void write_asm(keyword* root){
     if(!root){
         return;
     }
-    //write asm for function
     if(!root->isFunction.active){
         cout<<"root does not contain a funcition"<<endl;
         return;
@@ -245,13 +265,15 @@ void write_asm(keyword* root){
     }
     //this writes .global _<function name>
     outFile<<" .global " << root->isFunction.name<<endl;
-    //outFile<<".text"<<endl;
-    //outFile<<".global start"<<endl;
     outFile<<root->isFunction.name<<":"<<endl;
 
     int indent = 1;
     write_statement(root->isFunction.statement, indent, outFile);
+    outFile<<"ret"<<endl;
 }
+
+
+
 
 int main(int argc, char *argv[]){
     
@@ -278,7 +300,7 @@ int main(int argc, char *argv[]){
         return EXIT_FAILURE;
     }
     write_asm(root);
-    system("g++ out.s -o out");
+    system("g++ -g out.s -o out");
     return 0;
 }
 
