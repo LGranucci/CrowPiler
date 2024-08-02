@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <stdlib.h> 
 using namespace std;
 
 std::string alphabet = "abcdefghjkilmnopqrstuwyxvzABCDEFGHJKILMNOPQRSTUWYXVZ";
@@ -272,6 +273,10 @@ int main(int argc, char *argv[]){
         cout<<tokenList[i]<<endl;
     }
     keyword* root = parse(tokenList);
+    if(!root){
+        cout<<"\033[1;31merrore nel parser\033[0m\n";
+        return EXIT_FAILURE;
+    }
     write_asm(root);
     system("g++ out.s -o out");
     return 0;
