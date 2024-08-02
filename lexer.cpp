@@ -13,7 +13,8 @@ vector<string> lex(ifstream& myread){
 
     while(std::getline(myread, myText)){
         for(int i = 0; i < myText.length(); i++){
-            if(myText[i] == '{' || myText[i] == '}' || myText[i] == '(' || myText[i] == ')' || myText[i] == ';' || myText[i] == '-' || myText[i] == '~' || myText[i] == '!'){
+            if(myText[i] == '{' || myText[i] == '}' || myText[i] == '(' || myText[i] == ')' || myText[i] == ';' || myText[i] == '-' || myText[i] == '~' || myText[i] == '!'
+              || myText[i] == '+' || myText[i] == '/' || myText[i] == '*'){
                 
                 string aux(1, myText[i]);
                 tokenList.push_back(aux);
