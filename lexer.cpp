@@ -80,13 +80,25 @@ struct Constant{
     bool active;
     Constant() : active(false){};
 };
-struct expression{
+
+struct Factor{
+    expression* exp;
+    char un_op;
+    Factor* next_fact;
+    int value;
+};
+
+struct Term{
+    Factor* factorList;
     char op;
-    Constant* value;
+    Term* next_term;
+    Term() : next_term(nullptr){};
+};
+
+struct expression{
+    Term* term;
+    char op;
     expression* next_exp;
-    //true if Const is active
-    bool opOrInt;
-    expression() : opOrInt(true){};
 };
 
 struct Return{
@@ -118,31 +130,47 @@ char get_operator(string token){
     }
     else return 'Z';
 }
+
+Factor* parse_factor(vector<string> tokenList, int& startIndex){
+
+}
+
+Term* parse_term(vector<string> tokenList, int& startIndex){
+    Factor* first_factor = parse_factor(tokenList, startIndex);
+
+
+}
+
 expression* parse_expression(vector<string> tokenList, int& startIndex){
     //se sono arrivato ad un integer
-    expression* newExpr = new expression; 
-    if(numbers.find(tokenList[startIndex + 1][0]) != string::npos){
-
-        newExpr->value = new Constant;
-        newExpr->opOrInt = true;
-        newExpr->value->val = stoi(tokenList[startIndex + 1]);
-        newExpr->value->active = true;
-        return newExpr;
-    }
-    else{
-        char op = get_operator(tokenList[startIndex + 1]);
-        if(op == 'Z'){
-            cerr<<"erroneous operator"<<endl;
-            return nullptr;
-        }
+    expression* exp = new expression;
+    Term* term = parse_term(tokenList, startIndex);
+    exp->term = term;
+    while(tokenList.size() > (startIndex + 1) && (tokenList[startIndex + 1] == "+" || tokenList[startIndex + 1] == "-")){
+        //there is another expression
+        char op = get_operator(tokenList[startIndex]);
         startIndex++;
-        //recursive!
+        term = parse_term(tokenList, startIndex);
         
-        newExpr->next_exp = parse_expression(tokenList, startIndex);
-        newExpr->opOrInt = false;
-        newExpr->value = nullptr;
-        newExpr->op = op;
-        return newExpr;
+        expression* auxexp = new expression;
+        auxexp->term = term;
+        auxexp->op = op;
+        
+        //insert at end of list
+        if(!exp->next_exp){
+            exp->next_exp = auxexp;
+        }
+        else{
+            expression* aux = exp->next_exp;
+            while(aux->next_exp){
+                aux = aux->next_exp;
+            }
+            aux->next_exp = auxexp;
+        }
+
+    return exp;
+
+
     }
 }
 /**
@@ -225,11 +253,12 @@ void generate_indent(int indent, ofstream& outFile){
     }
 }
 void write_expression(expression* exp, ofstream& outFile){
+    /*
     if(exp->opOrInt){
         outFile<<"movq $" << exp->value->val<<", %rax"<<endl;
         return;
     }
-
+    */
     write_expression(exp->next_exp, outFile);
     if(exp->op == '-'){
         outFile<<"neg %rax"<<endl;    
