@@ -73,7 +73,7 @@ vector<string> lex(ifstream& myread){
     return tokenList;
 }
 struct keyword;
-
+struct expression;
 
 struct Constant{
     int val;
@@ -86,19 +86,21 @@ struct Factor{
     char un_op;
     Factor* next_fact;
     int value;
+    Factor() : exp(nullptr),next_fact(nullptr),un_op('Z'){};
 };
 
 struct Term{
     Factor* factorList;
     char op;
     Term* next_term;
-    Term() : next_term(nullptr){};
+    Term() : next_term(nullptr),op('Z'){};
 };
 
 struct expression{
     Term* term;
     char op;
     expression* next_exp;
+    expression() : term(nullptr),next_exp(nullptr),op('Z'){};
 };
 
 struct Return{
@@ -115,11 +117,87 @@ struct Function{
     Function() : active(false){};
 };
 struct keyword{
-    Return isReturn;
+    Return* isReturn;
     //BinaryOp isBinaryOp;
-    Constant isConstant;
-    Function isFunction;
+    Constant* isConstant;
+    Function* isFunction;
 };
+
+void pprint_expr(expression* exp);
+
+void pprint_fact(Factor* fact){
+    if(fact->exp){
+        cout<<"expression inside factor"<<endl;
+        pprint_expr(fact->exp);
+        return;
+    }
+    else if(fact->next_fact){
+        cout<<fact->un_op<<"FACTOR IN UNOP ";
+        pprint_fact(fact->next_fact);
+        return;
+    }
+    else{
+        cout<<fact->value<<endl;
+        return;
+    }
+
+}
+
+void pprint_term(Term* term){
+    if(term->op != 'Z')   
+        cout<<term->op;
+    cout<<"FACTOR ";
+    pprint_fact(term->factorList);
+    
+    if(term->next_term){
+  
+        pprint_term(term->next_term);
+        return;
+    }
+    return;
+}
+
+
+void pprint_expr(expression* exp){
+    cout<<"EXPRESSION ";
+    if(exp->op != 'Z')
+        cout<<"OP: "<<exp->op<<endl;
+    if(exp->term){
+        cout<<"TERM ";
+        pprint_term(exp->term);
+        if(!exp->next_exp){
+            return;
+        }
+       
+        pprint_expr(exp->next_exp);
+    }
+}
+
+void pretty_printer(keyword* root){
+    if(root->isFunction->active){
+        cout<<"FUNCTION "<<"\""<<root->isFunction->name<<"\""<<endl;
+    }
+    else{
+        return;
+    }
+    if(!root->isFunction->statement->isReturn->active){
+        return;
+    }
+    Return* ret = root->isFunction->statement->isReturn;
+    cout<<"RETURN "<<endl;
+    if(!ret->exp){
+        cerr<<"expression not present"<<endl;
+        return;
+    }
+    expression* expr = ret->exp;
+    pprint_expr(expr);
+    
+    return;
+}
+
+
+expression* parse_expression(vector<string> tokenList, int& startIndex);
+
 
 /**
  * @brief parses a token to see if its an unary operator. returns Z if fails.
@@ -132,14 +210,62 @@ char get_operator(string token){
 }
 
 Factor* parse_factor(vector<string> tokenList, int& startIndex){
-
+    Factor* fact = new Factor;
+    if(tokenList.size() < startIndex + 1){
+        return nullptr;
+    }
+    startIndex++;
+    if(tokenList[startIndex][0] == '('){
+        expression* exp = parse_expression(tokenList, startIndex);
+        if(!exp) return nullptr;
+        startIndex++;
+        if(tokenList[startIndex][0] != ')'){
+            return nullptr;
+        }
+        fact->exp = exp;
+    }
+    //if unary operator
+    else if(get_operator(tokenList[startIndex]) != 'Z'){
+        char op = get_operator(tokenList[startIndex]);
+        Factor* next = parse_factor(tokenList, startIndex);
+        fact->un_op = op;
+        fact->next_fact = next;
+    }
+    //if an integer
+    else if(numbers.find(tokenList[startIndex][0]) != string::npos){
+        fact->value = stoi(tokenList[startIndex]);
+    }
+    return fact;
 }
 
 Term* parse_term(vector<string> tokenList, int& startIndex){
+    Term* term = new Term;
+    
     Factor* first_factor = parse_factor(tokenList, startIndex);
-
-
+    term->factorList = first_factor;
+    while(tokenList.size() > (startIndex + 1) && (tokenList[startIndex + 1] == "*" || tokenList[startIndex + 1] == "/")){
+        startIndex++;
+        char op = tokenList[startIndex][0];
+        
+        first_factor = parse_factor(tokenList, startIndex);
+        Term* auxTerm = new Term;
+        auxTerm->factorList = first_factor;
+        auxTerm->op = op;
+        auxTerm->next_term = nullptr;
+        if(!term->next_term){
+            term->next_term = auxTerm;
+        }
+        else{
+            Term* aux = term->next_term;
+            while(aux->next_term){
+                aux = aux->next_term;
+            }
+            aux->next_term = auxTerm;
+        }
+    }
+    return term;
 }
+
 
 expression* parse_expression(vector<string> tokenList, int& startIndex){
     //se sono arrivato ad un integer
@@ -148,8 +274,9 @@ expression* parse_expression(vector<string> tokenList, int& startIndex){
     exp->term = term;
     while(tokenList.size() > (startIndex + 1) && (tokenList[startIndex + 1] == "+" || tokenList[startIndex + 1] == "-")){
         //there is another expression
-        char op = get_operator(tokenList[startIndex]);
         startIndex++;
+        char op = tokenList[startIndex][0];
+        
         term = parse_term(tokenList, startIndex);
         
         expression* auxexp = new expression;
@@ -167,11 +294,8 @@ expression* parse_expression(vector<string> tokenList, int& startIndex){
             }
             aux->next_exp = auxexp;
         }
-
-    return exp;
-
-
     }
+    return exp;
 }
 /**
  * @brief parses a statement, which (for now) can only be of type `return <operation>`
@@ -188,12 +312,12 @@ keyword* parse_statement(vector<string> tokenList, int& startIndex){
     }
    
     keyword* stat = new keyword;
-    stat->isReturn.exp = parse_expression(tokenList, startIndex); 
-    if(tokenList[startIndex + 2] != ";"){
+    stat->isReturn->exp = parse_expression(tokenList, startIndex); 
+    if(tokenList[startIndex + 1] != ";"){
         return nullptr;
     }
-    startIndex+= 2;
-    stat->isReturn.active = true;
+    startIndex+= 1;
+    stat->isReturn->active = true;
     return stat;
 }
 
@@ -224,11 +348,12 @@ keyword* parse(vector<string> tokenList){
         cout<<"missing openinig curly bracket"<<endl;
         return nullptr;
     }
-    root->isFunction.name = tokenList[1];
-    root->isFunction.active = true;
+    root->isFunction = new Function;
+    root->isFunction->name = tokenList[1];
+    root->isFunction->active = true;
     int index = 5;
-    root->isFunction.statement = parse_statement(tokenList, index);
-    if(!root->isFunction.statement){
+    root->isFunction->statement = parse_statement(tokenList, index);
+    if(!root->isFunction->statement){
         cout<<"function does not contain a valid statement"<<endl;
         return nullptr;
     }
@@ -274,17 +399,17 @@ void write_expression(expression* exp, ofstream& outFile){
     
 }
 void write_statement(keyword* stat, int indent, ofstream& outFile){
-    if(!stat || !stat->isReturn.active){
+    if(!stat || !stat->isReturn->active){
         return;
     }
-    write_expression(stat->isReturn.exp, outFile);
+    write_expression(stat->isReturn->exp, outFile);
 }
 
 void write_asm(keyword* root){
     if(!root){
         return;
     }
-    if(!root->isFunction.active){
+    if(!root->isFunction->active){
         cout<<"root does not contain a funcition"<<endl;
         return;
     }
@@ -294,11 +419,11 @@ void write_asm(keyword* root){
         return;
     }
     //this writes .global _<function name>
-    outFile<<" .global " << root->isFunction.name<<endl;
-    outFile<<root->isFunction.name<<":"<<endl;
+    outFile<<" .global " << root->isFunction->name<<endl;
+    outFile<<root->isFunction->name<<":"<<endl;
 
     int indent = 1;
-    write_statement(root->isFunction.statement, indent, outFile);
+    write_statement(root->isFunction->statement, indent, outFile);
     outFile<<"ret"<<endl;
 }
 
@@ -329,8 +454,9 @@ int main(int argc, char *argv[]){
         cout<<"\033[1;31merrore nel parser\033[0m\n";
         return EXIT_FAILURE;
     }
-    write_asm(root);
-    system("g++ -g out.s -o out");
+    pretty_printer(root);
+    //write_asm(root);
+    //system("g++ -g out.s -o out");
     return 0;
 }
 
