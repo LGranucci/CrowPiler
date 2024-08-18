@@ -33,3 +33,6 @@
 
 /tests/
 test1.txt
+out.s
+out
+lexer
