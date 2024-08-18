@@ -121,6 +121,7 @@ struct keyword{
     //BinaryOp isBinaryOp;
     Constant* isConstant;
     Function* isFunction;
+    keyword(): isReturn(nullptr), isConstant(nullptr), isFunction(nullptr){};
 };
 
 void pprint_expr(expression* exp);
@@ -312,6 +313,8 @@ keyword* parse_statement(vector<string> tokenList, int& startIndex){
     }
    
     keyword* stat = new keyword;
+    Return* ret = new Return;
+    stat->isReturn = ret;
     stat->isReturn->exp = parse_expression(tokenList, startIndex); 
     if(tokenList[startIndex + 1] != ";"){
         return nullptr;
@@ -377,26 +380,69 @@ void generate_indent(int indent, ofstream& outFile){
         outFile<<" ";
     }
 }
-void write_expression(expression* exp, ofstream& outFile){
-    /*
-    if(exp->opOrInt){
-        outFile<<"movq $" << exp->value->val<<", %rax"<<endl;
+
+void write_expression(expression*, ofstream&);
+void write_factor(Factor* fact, ofstream& outFile){
+    if(!fact->exp && !fact->next_fact && fact->un_op == 'Z'){
+        outFile<<"movq $" << fact->value <<", %rax"<<endl;
         return;
     }
-    */
-    write_expression(exp->next_exp, outFile);
-    if(exp->op == '-'){
+    if(fact->exp){
+        write_expression(fact->exp, outFile);
+    }
+    if(fact->next_fact){
+        write_factor(fact->next_fact, outFile);
+    }
+    if(fact->un_op == '-'){
         outFile<<"neg %rax"<<endl;    
     }
-    if(exp->op == '!'){
+    if(fact->un_op == '!'){
         outFile<<"cmpq $0, %rax"<<endl;
         outFile<<"movq $0, %rax"<<endl;
         outFile<<"sete \%al"<<endl;
     }
-    if(exp->op == '~'){
+    if(fact->un_op == '~'){
         outFile<<"not %rax"<<endl;
     }
+}
+
+void write_term(Term* term, ofstream& outFile){
+    write_factor(term->factorList,outFile );
+    if(term->op != 'Z'){
+        outFile<<"pop %rcx"<<endl;
+    }
     
+    if(term->op == '*'){
+        outFile<<"imul %rcx"<<endl;
+    }
+    else if(term->op == '/'){
+        outFile<<"movq $0, %rdx"<<endl;
+        outFile<<"idiv %rcx"<<endl;
+    }
+    if(term->next_term){
+        outFile<<"push %rax"<<endl;
+        write_term(term->next_term, outFile);
+    }
+}
+
+void write_expression(expression* exp, ofstream& outFile){
+    
+    write_term(exp->term, outFile);
+    if(exp->op != 'Z'){
+        outFile<<"pop %rcx"<<endl;
+    }
+    if(exp->op == '+'){
+        outFile<<"addq %rcx, %rax"<<endl;
+    }
+    else if (exp->op == '-'){
+        outFile<<"subq %rax, %rcx"<<endl;
+        outFile<<"movq %rcx, %rax"<<endl;
+    }
+    if(exp->next_exp){
+        outFile<<"push %rax"<<endl;
+        write_expression(exp->next_exp, outFile);
+    }
+
 }
 void write_statement(keyword* stat, int indent, ofstream& outFile){
     if(!stat || !stat->isReturn->active){
@@ -436,7 +482,7 @@ int main(int argc, char *argv[]){
         std::cerr << "Usage: " << argv[0] << " <filename>" << std::endl;
         return EXIT_FAILURE;
     }
-    
+
     std::ifstream myread(argv[1]);
     if (!myread.is_open()) {
         std::cerr << "Error opening file: " << argv[1] << std::endl;
@@ -455,8 +501,8 @@ int main(int argc, char *argv[]){
         return EXIT_FAILURE;
     }
     pretty_printer(root);
-    //write_asm(root);
-    //system("g++ -g out.s -o out");
+    write_asm(root);
+    system("g++ -g out.s -o out");
     return 0;
 }
 
