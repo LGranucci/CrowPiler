@@ -13,12 +13,66 @@ vector<string> lex(ifstream& myread){
 
     while(std::getline(myread, myText)){
         for(int i = 0; i < myText.length(); i++){
-            if(myText[i] == '{' || myText[i] == '}' || myText[i] == '(' || myText[i] == ')' || myText[i] == ';' || myText[i] == '-' || myText[i] == '~' || myText[i] == '!'
+            if(myText[i] == '{' || myText[i] == '}' || myText[i] == '(' || myText[i] == ')' || myText[i] == ';' || myText[i] == '-' || myText[i] == '~'  
               || myText[i] == '+' || myText[i] == '/' || myText[i] == '*'){
                 
                 string aux(1, myText[i]);
                 tokenList.push_back(aux);
                 continue;
+            }
+            else if(myText[i] == '>'){
+                if(myText.length() > i + 1 && myText[i+1] == '='){
+                    tokenList.push_back(">=");
+                    i++;
+                    continue;
+                }
+                else{
+                    tokenList.push_back(">");
+                    continue;
+                }
+            }
+            else if(myText[i] == '<'){
+                if(myText.length() > i + 1 && myText[i+1] == '='){
+                    tokenList.push_back("<=");
+                    i++;
+                    continue;
+                }
+                else{
+                    tokenList.push_back("<");
+                    continue;
+                }
+            }
+            else if(myText[i] =='!'){
+                if(myText.length() > i + 1 && myText[i+1] == '='){
+                    tokenList.push_back("!=");
+                    i++;
+                    continue;
+                }
+                else{
+                    tokenList.push_back("!");
+                    continue;
+                }
+            }
+            else if(myText[i] == '|' && myText.length() > i + 1){
+                if(myText[i + 1] == '|'){
+                    tokenList.push_back("||");
+                    i++;
+                    continue;
+                }
+            }
+            else if(myText[i] == '&' && myText.length() > i + 1){
+                if(myText[i + 1] == '&'){
+                    tokenList.push_back("&&");
+                    i++;
+                    continue;
+                }
+            }
+            else if(myText[i] == '=' && myText.length() > i + 1){
+                if(myText[i + 1] == '='){
+                    tokenList.push_back("==");
+                    i++;
+                    continue;
+                }
             }
             else if(myText[i] == 'i' && myText.length() > i + 2){ 
                 std::string aux = myText.substr(i, 3);
