@@ -149,12 +149,33 @@ struct Term{
     Term* next_term;
     Term() : next_term(nullptr),op('Z'){};
 };
-
-struct expression{
+struct AdditiveExp{
     Term* term;
+    AdditiveExp* next_add;
     char op;
+    AdditiveExp() : term(nullptr), next_add(nullptr), op('Z'){};
+};
+struct RelationalExp{
+    RelationalExp* next_rel;
+    AdditiveExp* add;
+    string op;
+    RelationalExp() : next_rel(nullptr), add(nullptr), op("Z"){};
+};
+struct EqualityExp{
+    EqualityExp* next_eq;
+    RelationalExp* rel;
+    char op;
+    EqualityExp() : next_eq(nullptr), rel(nullptr), op('Z'){};
+};
+struct LogicalExp{
+    LogicalExp* next_log;
+    EqualityExp* equal;
+    LogicalExp() : next_log(nullptr), equal(nullptr){};
+};
+struct expression{
+    LogicalExp* logic;
     expression* next_exp;
-    expression() : term(nullptr),next_exp(nullptr),op('Z'){};
+    expression() : logic(nullptr),next_exp(nullptr){};
 };
 
 struct Return{
