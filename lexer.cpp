@@ -232,19 +232,66 @@ void pprint_term(Term* term){
     }
     return;
 }
+void pprint_add(AdditiveExp* add){
+    cout<<"ADDEXP ";
+    if(add->op != 'Z'){
+        cout<<add->op;
+    }
+    if(add->term){
+        pprint_term(add->term);
+    }
+    if(add->next_add){
+        pprint_add(add->next_add);
+    }
+    return;
+}
+void pprint_rel(RelationalExp* rel){
+    cout<<"RELEXP ";
+    if(rel->op != "Z"){
+        cout<<rel->op;
+    }
+    if(rel->add){
+        pprint_add(rel->add);
+    }
+    if(rel->next_rel){
+        pprint_rel(rel->next_rel);
+    }
+    return;
+}
+void pprint_equal(EqualityExp* equal){
+    cout<<"EQUALEXP ";
+    if(equal->op != 'Z'){
+        cout<< equal->op;
+    }
+    if(equal->rel){
+        pprint_rel(equal->rel);
+    }
+    if(equal->next_eq){
+        pprint_equal(equal->next_eq);
+    }
+    return;
+}
+void pprint_logic(LogicalExp* logic){
+    cout<<"LOGICALEXP ";
+    if(logic->equal){
+        pprint_equal(logic->equal);
+    
+    }
+    if(logic->next_log){
+        cout<<" && ";
+        pprint_logic(logic->next_log);
 
+    }
+}
 
 void pprint_expr(expression* exp){
     cout<<"EXPRESSION ";
-    if(exp->op != 'Z')
-        cout<<"OP: "<<exp->op<<endl;
-    if(exp->term){
-        cout<<"TERM ";
-        pprint_term(exp->term);
+    if(exp->logic){
+        pprint_logic(exp->logic);
         if(!exp->next_exp){
             return;
         }
-       
+        cout<<" || ";
         pprint_expr(exp->next_exp);
     }
 }
@@ -341,23 +388,125 @@ Term* parse_term(vector<string> tokenList, int& startIndex){
     }
     return term;
 }
+AdditiveExp* parse_add(vector<string> tokenList, int& startIndex){
+    AdditiveExp* add = new AdditiveExp;
+    Term* term = parse_term(tokenList, startIndex);
+    add->term = term;
+    while(tokenList.size() > (startIndex + 1) && (tokenList[startIndex + 1] == "+" || tokenList[startIndex + 1] == "-")){
+        startIndex++;
+        char op = tokenList[startIndex][0];
+        term = parse_term(tokenList, startIndex);
+        AdditiveExp* auxAdd = new AdditiveExp;
+        auxAdd->next_add = nullptr;
+        auxAdd->term = term;
+        auxAdd->op = op;
+        if(!add->next_add){
+            add->next_add = auxAdd;
+        }
+        else{
+            AdditiveExp* aux = add->next_add;
+            while(aux->next_add){
+                aux = aux->next_add;
+            }
+            aux->next_add = auxAdd;
+        }       
+    }
+    return add;
+}
 
+RelationalExp* parse_rel(vector<string> tokenList, int& startIndex){
+    RelationalExp* rel = new RelationalExp;
+    AdditiveExp* add = parse_add(tokenList, startIndex);
+    rel->add = add;
+    while(tokenList.size() > (startIndex + 1) && (tokenList[startIndex + 1] == "<" || tokenList[startIndex + 1] == ">" || tokenList[startIndex + 1] == "<=" || tokenList[startIndex + 1]== ">=")){
+        startIndex++;
+        string op = tokenList[startIndex];
+        add = parse_add(tokenList, startIndex);
+        RelationalExp* auxRel = new RelationalExp;
+        auxRel->add = add;
+        auxRel->op = op;
+        auxRel->next_rel = nullptr;
+        if(!rel->next_rel){
+            rel->next_rel = auxRel;
+        }
+        else{
+            RelationalExp* aux = rel->next_rel;
+            while (aux->next_rel){
+                aux = aux->next_rel;
+            }
+            aux->next_rel = auxRel;
+            
+        }
+    }
+    return rel;
+}
+
+
+EqualityExp* parse_equal(vector<string> tokenList, int& startIndex){
+    EqualityExp* equal = new EqualityExp;
+    
+    RelationalExp* rel = parse_rel(tokenList, startIndex);
+    equal->rel = rel;
+    while(tokenList.size() > (startIndex + 1) && (tokenList[startIndex + 1] == "!=" || tokenList[startIndex + 1] == "==")){
+        startIndex++;
+        char op = tokenList[startIndex][0];
+        rel = parse_rel(tokenList, startIndex);
+        EqualityExp* auxEq = new EqualityExp;
+        auxEq->rel = rel;
+        auxEq->op = op;
+        auxEq->next_eq = nullptr;
+        if(!equal->next_eq){
+            equal->next_eq = auxEq;
+        }
+        else{
+            EqualityExp* aux = equal->next_eq;
+            while(aux->next_eq){
+                aux = aux->next_eq;
+            }
+            aux->next_eq = auxEq;
+        }
+    }
+    return equal;
+}
+
+
+LogicalExp* parse_logical(vector<string> tokenList, int& startIndex){
+    LogicalExp* logic = new LogicalExp;
+    EqualityExp* eq = parse_equal(tokenList, startIndex);
+    logic->equal = eq;
+    while(tokenList.size() > (startIndex + 1) && (tokenList[startIndex + 1] == "&&")){
+        startIndex++;
+        eq = parse_equal(tokenList, startIndex);
+        LogicalExp* auxlog = new LogicalExp;
+        auxlog->equal = eq;
+        if(!logic->next_log){
+            logic->next_log = auxlog;
+        }
+        else{
+            LogicalExp* aux = logic->next_log;
+            while(aux->next_log){
+                aux = aux->next_log;
+            }
+            aux->next_log = auxlog;
+        }
+    }
+    return logic;
+
+}
 
 expression* parse_expression(vector<string> tokenList, int& startIndex){
     //se sono arrivato ad un integer
     expression* exp = new expression;
-    Term* term = parse_term(tokenList, startIndex);
-    exp->term = term;
-    while(tokenList.size() > (startIndex + 1) && (tokenList[startIndex + 1] == "+" || tokenList[startIndex + 1] == "-")){
-        //there is another expression
+    LogicalExp* logic = parse_logical(tokenList, startIndex);
+    exp->logic = logic;
+    while(tokenList.size() > (startIndex + 1) && (tokenList[startIndex + 1] == "||")){
+        //there is another logicalExp
         startIndex++;
-        char op = tokenList[startIndex][0];
-        
-        term = parse_term(tokenList, startIndex);
+        logic = parse_logical(tokenList, startIndex);
         
         expression* auxexp = new expression;
-        auxexp->term = term;
-        auxexp->op = op;
+        auxexp->logic = logic;
+      
         
         //insert at end of list
         if(!exp->next_exp){
@@ -455,7 +604,7 @@ void generate_indent(int indent, ofstream& outFile){
         outFile<<" ";
     }
 }
-
+/*
 void write_expression(expression*, ofstream&);
 void write_factor(Factor* fact, ofstream& outFile){
     if(!fact->exp && !fact->next_fact && fact->un_op == 'Z'){
@@ -519,6 +668,7 @@ void write_expression(expression* exp, ofstream& outFile){
     }
 
 }
+
 void write_statement(keyword* stat, int indent, ofstream& outFile){
     if(!stat || !stat->isReturn->active){
         return;
@@ -547,7 +697,7 @@ void write_asm(keyword* root){
     write_statement(root->isFunction->statement, indent, outFile);
     outFile<<"ret"<<endl;
 }
-
+*/
 
 
 
@@ -576,8 +726,8 @@ int main(int argc, char *argv[]){
         return EXIT_FAILURE;
     }
     pretty_printer(root);
-    write_asm(root);
-    system("g++ -g out.s -o out");
+    //write_asm(root);
+    //system("g++ -g out.s -o out");
     return 0;
 }
 
