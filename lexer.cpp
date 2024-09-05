@@ -3,7 +3,7 @@
 #include <vector>
 #include <stdlib.h> 
 using namespace std;
-
+//prova!
 std::string alphabet = "abcdefghjkilmnopqrstuwyxvzABCDEFGHJKILMNOPQRSTUWYXVZ";
 std::string numbers = "0123456789";
 vector<string> lex(ifstream& myread){
