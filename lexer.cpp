@@ -4,7 +4,6 @@
 #include <stdlib.h> 
 using namespace std;
 //prova!
-//AAAAAAAAAAAAAAAA
 std::string alphabet = "abcdefghjkilmnopqrstuwyxvzABCDEFGHJKILMNOPQRSTUWYXVZ";
 std::string numbers = "0123456789";
 vector<string> lex(ifstream& myread){
@@ -605,7 +604,12 @@ void generate_indent(int indent, ofstream& outFile){
         outFile<<" ";
     }
 }
-/*
+
+//should probably not have global scope
+int auxLabel = 0;
+string generate_label(string type){
+    return type + "_" + to_string(auxLabel++); 
+}
 void write_expression(expression*, ofstream&);
 void write_factor(Factor* fact, ofstream& outFile){
     if(!fact->exp && !fact->next_fact && fact->un_op == 'Z'){
@@ -650,7 +654,7 @@ void write_term(Term* term, ofstream& outFile){
     }
 }
 
-void write_expression(expression* exp, ofstream& outFile){
+void write_additive_exp(AdditiveExp* exp, ofstream& outFile){
     
     write_term(exp->term, outFile);
     if(exp->op != 'Z'){
@@ -663,18 +667,76 @@ void write_expression(expression* exp, ofstream& outFile){
         outFile<<"subq %rax, %rcx"<<endl;
         outFile<<"movq %rcx, %rax"<<endl;
     }
-    if(exp->next_exp){
+    if(exp->next_add){
         outFile<<"push %rax"<<endl;
-        write_expression(exp->next_exp, outFile);
+        write_additive_exp(exp->next_add, outFile);
+    }
+
+}
+void write_relational_exp(RelationalExp* rexp, ofstream& outFile){
+    write_additive_exp(rexp->add, outFile);
+    if(rexp->op != "Z"){
+        outFile<<"pop %rcx" << endl;
+    }
+
+
+    if(rexp->next_rel){
+        write_relational_exp(rexp->next_rel, outFile);
     }
 
 }
 
+
+void write_equality_exp(EqualityExp* eexp, ofstream& outFile){
+    write_relational_exp(eexp->rel, outFile);
+    if(eexp->op != 'Z'){
+        outFile<<"pop %rcx"<<endl;
+    }
+    if(eexp->op == '='){
+        cout<<"HELP"<<endl;
+    }
+
+
+    if(eexp->next_eq){
+        outFile<<"push %rax";
+        write_equality_exp(eexp->next_eq, outFile);
+    }
+
+}
+
+
+void write_logic_and(LogicalExp* lexp,bool first, ofstream& outFile){
+    write_equality_exp(lexp->equal, outFile);
+    if(!first){
+        outFile<<"pop %rcx"<<endl;
+    }
+    first = false;
+    //codice per and logico
+
+    if(lexp->next_log){
+        outFile<<"push %rax"<<endl;
+        write_logic_and(lexp->next_log, first, outFile);
+    }
+}
+
+
+void write_expression(expression* exp,bool first, ofstream& outFile){
+    write_logic_and(exp->logic,true, outFile);
+    if(!first){
+        outFile<<"pop %rcx"<<endl;
+    }
+    first = false;
+    /*codice per or logico*/
+    if(exp->next_exp){
+        outFile<<"push %rax"<<endl;
+        write_expression(exp->next_exp,first, outFile);
+    }
+}
 void write_statement(keyword* stat, int indent, ofstream& outFile){
     if(!stat || !stat->isReturn->active){
         return;
     }
-    write_expression(stat->isReturn->exp, outFile);
+    write_expression(stat->isReturn->exp,true, outFile);
 }
 
 void write_asm(keyword* root){
@@ -698,7 +760,7 @@ void write_asm(keyword* root){
     write_statement(root->isFunction->statement, indent, outFile);
     outFile<<"ret"<<endl;
 }
-*/
+
 
 
 
