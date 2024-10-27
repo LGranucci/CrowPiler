@@ -610,14 +610,16 @@ int auxLabel = 0;
 string generate_label(string type){
     return type + "_" + to_string(auxLabel++); 
 }
-void write_expression(expression*, ofstream&);
+void write_expression(expression*,bool, ofstream&);
+
+
 void write_factor(Factor* fact, ofstream& outFile){
     if(!fact->exp && !fact->next_fact && fact->un_op == 'Z'){
         outFile<<"movq $" << fact->value <<", %rax"<<endl;
         return;
     }
     if(fact->exp){
-        write_expression(fact->exp, outFile);
+        write_expression(fact->exp,true, outFile);
     }
     if(fact->next_fact){
         write_factor(fact->next_fact, outFile);
@@ -678,7 +680,26 @@ void write_relational_exp(RelationalExp* rexp, ofstream& outFile){
     if(rexp->op != "Z"){
         outFile<<"pop %rcx" << endl;
     }
-
+    if(rexp->op == "<"){
+        outFile<<"cmpq %rax, %rcx"<<endl;
+        outFile<<"movq $0, %rax"<<endl;
+        outFile<<"setl \%al"<<endl;
+    }
+    if(rexp->op == ">"){
+        outFile<<"cmpq %rax, %rcx"<<endl;
+        outFile<<"movq $0, %rax"<<endl;
+        outFile<<"setg \%al"<<endl;
+    }
+    if(rexp->op == "<="){
+        outFile<<"cmpq %rax, %rcx"<<endl;
+        outFile<<"movq $0, %rax"<<endl;
+        outFile<<"setle \%al"<<endl;
+    }
+    if(rexp->op == ">="){
+        outFile<<"cmpq %rax, %rcx"<<endl;
+        outFile<<"movq $0, %rax"<<endl;
+        outFile<<"setge \%al"<<endl;
+    }
 
     if(rexp->next_rel){
         write_relational_exp(rexp->next_rel, outFile);
@@ -693,10 +714,15 @@ void write_equality_exp(EqualityExp* eexp, ofstream& outFile){
         outFile<<"pop %rcx"<<endl;
     }
     if(eexp->op == '='){
-        cout<<"HELP"<<endl;
+        outFile<<"cmpq %rcx, %rcx"<<endl;
+        outFile<<"movq $0, %rax"<<endl;
+        outFile<<"sete \%al"<<endl;
     }
-
-
+    if(eexp->op == '!'){
+        outFile<<"cmpq %rcx, %rcx"<<endl;
+        outFile<<"movq $0, %rax"<<endl;
+        outFile<<"setne \%al"<<endl;
+    }
     if(eexp->next_eq){
         outFile<<"push %rax";
         write_equality_exp(eexp->next_eq, outFile);
@@ -704,32 +730,54 @@ void write_equality_exp(EqualityExp* eexp, ofstream& outFile){
 
 }
 
-
+string labelEndAnd;
 void write_logic_and(LogicalExp* lexp,bool first, ofstream& outFile){
     write_equality_exp(lexp->equal, outFile);
-    if(!first){
-        outFile<<"pop %rcx"<<endl;
+    if(first && lexp->next_log){
+        outFile<< "cmpq $0, %rax"<<endl;
+        string label = generate_label("clause");
+        outFile<< "jne "<< label<<endl;
+        labelEndAnd = generate_label("end");
+        outFile<<"jmp " << labelEndAnd<<endl;
+        outFile<<label<< ":"<<endl;
     }
-    first = false;
+    if(!first){
+        outFile<<"cmpq $0, %rax"<<endl;
+        outFile<<"movq $0, %rax"<<endl;
+        outFile<<"setne \%al"<<endl;
+        outFile<<labelEndAnd << ':'<<endl;    
+    }
     //codice per and logico
 
     if(lexp->next_log){
-        outFile<<"push %rax"<<endl;
-        write_logic_and(lexp->next_log, first, outFile);
+        
+        write_logic_and(lexp->next_log, !first, outFile);
     }
 }
 
-
+string labelEndOr;
 void write_expression(expression* exp,bool first, ofstream& outFile){
     write_logic_and(exp->logic,true, outFile);
-    if(!first){
-        outFile<<"pop %rcx"<<endl;
+    if(first && exp->next_exp){
+        outFile<< "cmpq $0, %rax"<<endl;
+        string label = generate_label("clause");
+        outFile<< "je "<< label<<endl;
+        outFile<<"movq $1, %rax"<<endl;
+        labelEndOr = generate_label("end");
+        outFile<<"jmp " << labelEndOr<<endl;
+        outFile<<label<<':'<<endl;
     }
-    first = false;
-    /*codice per or logico*/
+    if(!first){
+        outFile<<"cmpq $0, %rax"<<endl;
+        outFile<<"movq $0, %rax"<<endl;
+        outFile<<"setne \%al"<<endl;
+        cout<<"QUI LABEL" << labelEndOr;
+        outFile<<labelEndOr << ':'<<endl;    
+    }
+    
     if(exp->next_exp){
-        outFile<<"push %rax"<<endl;
-        write_expression(exp->next_exp,first, outFile);
+       
+        write_expression(exp->next_exp,!first, outFile);
     }
 }
 void write_statement(keyword* stat, int indent, ofstream& outFile){
@@ -765,17 +813,19 @@ void write_asm(keyword* root){
 
 
 int main(int argc, char *argv[]){
-    
+    /*
     if (argc != 2) {
         std::cerr << "Usage: " << argv[0] << " <filename>" << std::endl;
         return EXIT_FAILURE;
     }
-
-    std::ifstream myread(argv[1]);
+*/
+    std::ifstream myread(/*argv[1]*/"prova.c");
+    
     if (!myread.is_open()) {
         std::cerr << "Error opening file: " << argv[1] << std::endl;
         return EXIT_FAILURE;
     }
+    
     vector<string> tokenList = lex(myread);
     myread.close();
 
@@ -789,8 +839,8 @@ int main(int argc, char *argv[]){
         return EXIT_FAILURE;
     }
     pretty_printer(root);
-    //write_asm(root);
-    //system("g++ -g out.s -o out");
+    write_asm(root);
+    system("g++ -g out.s -o out");
     return 0;
 }
 
