@@ -71,16 +71,16 @@ struct expression{
     expression() : logic(nullptr),next_exp(nullptr){};
 };
 
-struct Return{
+struct Statement{
     expression* exp;
     
     bool active;
-    Return() : active(false){};
+    Statement() : active(false){};
 };
 
 struct Function{
     string name;
-    Return* statement;
+    Statement* statement;
     bool active;
     Function() : active(false){};
 };

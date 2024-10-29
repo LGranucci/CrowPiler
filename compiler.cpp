@@ -238,7 +238,7 @@ void pretty_printer(Function* root){
     if(!root->statement->active){
         return;
     }
-    Return* ret = root->statement;
+    Statement* ret = root->statement;
     cout<<"RETURN "<<endl;
     if(!ret->exp){
         cerr<<"expression not present"<<endl;
@@ -460,7 +460,7 @@ expression* parse_expression(vector<string> tokenList, int& startIndex){
  * @param startIndex index that indicates where to start accessing the vector from
  * 
  */
-Return* parse_statement(vector<string> tokenList, int& startIndex){
+Statement* parse_statement(vector<string> tokenList, int& startIndex){
     if(tokenList.size()  <= (startIndex + 2)){
         return nullptr;
     }
@@ -468,7 +468,7 @@ Return* parse_statement(vector<string> tokenList, int& startIndex){
         return nullptr;
     }
    
-    Return* stat = new Return;
+    Statement* stat = new Statement;
     stat->exp = parse_expression(tokenList, startIndex); 
     if(tokenList[startIndex + 1] != ";"){
         return nullptr;
@@ -710,7 +710,7 @@ void write_expression(expression* exp,bool first, ofstream& outFile){
         write_expression(exp->next_exp,!first, outFile);
     }
 }
-void write_statement(Return* stat, int indent, ofstream& outFile){
+void write_statement(Statement* stat, int indent, ofstream& outFile){
     if(!stat || !stat->active){
         return;
     }
