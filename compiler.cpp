@@ -2,10 +2,10 @@
 #include <fstream>
 #include <vector>
 #include <stdlib.h> 
+#include "compiler.h"
 using namespace std;
 //prova!
-std::string alphabet = "abcdefghjkilmnopqrstuwyxvzABCDEFGHJKILMNOPQRSTUWYXVZ";
-std::string numbers = "0123456789";
+
 vector<string> lex(ifstream& myread){
     std::string myText;
    
@@ -73,6 +73,10 @@ vector<string> lex(ifstream& myread){
                     i++;
                     continue;
                 }
+                else{
+                    tokenList.push_back("=");
+                    continue;
+                }
             }
             else if(myText[i] == 'i' && myText.length() > i + 2){ 
                 std::string aux = myText.substr(i, 3);
@@ -126,78 +130,6 @@ vector<string> lex(ifstream& myread){
 
     return tokenList;
 }
-struct keyword;
-struct expression;
-
-struct Constant{
-    int val;
-    bool active;
-    Constant() : active(false){};
-};
-
-struct Factor{
-    expression* exp;
-    char un_op;
-    Factor* next_fact;
-    int value;
-    Factor() : exp(nullptr),next_fact(nullptr),un_op('Z'){};
-};
-
-struct Term{
-    Factor* factorList;
-    char op;
-    Term* next_term;
-    Term() : next_term(nullptr),op('Z'){};
-};
-struct AdditiveExp{
-    Term* term;
-    AdditiveExp* next_add;
-    char op;
-    AdditiveExp() : term(nullptr), next_add(nullptr), op('Z'){};
-};
-struct RelationalExp{
-    RelationalExp* next_rel;
-    AdditiveExp* add;
-    string op;
-    RelationalExp() : next_rel(nullptr), add(nullptr), op("Z"){};
-};
-struct EqualityExp{
-    EqualityExp* next_eq;
-    RelationalExp* rel;
-    char op;
-    EqualityExp() : next_eq(nullptr), rel(nullptr), op('Z'){};
-};
-struct LogicalExp{
-    LogicalExp* next_log;
-    EqualityExp* equal;
-    LogicalExp() : next_log(nullptr), equal(nullptr){};
-};
-struct expression{
-    LogicalExp* logic;
-    expression* next_exp;
-    expression() : logic(nullptr),next_exp(nullptr){};
-};
-
-struct Return{
-    expression* exp;
-    
-    bool active;
-    Return() : active(false){};
-};
-
-struct Function{
-    string name;
-    keyword* statement;
-    bool active;
-    Function() : active(false){};
-};
-struct keyword{
-    Return* isReturn;
-    //BinaryOp isBinaryOp;
-    Constant* isConstant;
-    Function* isFunction;
-    keyword(): isReturn(nullptr), isConstant(nullptr), isFunction(nullptr){};
-};
 
 void pprint_expr(expression* exp);
 
@@ -296,17 +228,17 @@ void pprint_expr(expression* exp){
     }
 }
 
-void pretty_printer(keyword* root){
-    if(root->isFunction->active){
-        cout<<"FUNCTION "<<"\""<<root->isFunction->name<<"\""<<endl;
+void pretty_printer(Function* root){
+    if(root->active){
+        cout<<"FUNCTION "<<"\""<<root->name<<"\""<<endl;
     }
     else{
         return;
     }
-    if(!root->isFunction->statement->isReturn->active){
+    if(!root->statement->active){
         return;
     }
-    Return* ret = root->isFunction->statement->isReturn;
+    Return* ret = root->statement;
     cout<<"RETURN "<<endl;
     if(!ret->exp){
         cerr<<"expression not present"<<endl;
@@ -528,7 +460,7 @@ expression* parse_expression(vector<string> tokenList, int& startIndex){
  * @param startIndex index that indicates where to start accessing the vector from
  * 
  */
-keyword* parse_statement(vector<string> tokenList, int& startIndex){
+Return* parse_statement(vector<string> tokenList, int& startIndex){
     if(tokenList.size()  <= (startIndex + 2)){
         return nullptr;
     }
@@ -536,21 +468,19 @@ keyword* parse_statement(vector<string> tokenList, int& startIndex){
         return nullptr;
     }
    
-    keyword* stat = new keyword;
-    Return* ret = new Return;
-    stat->isReturn = ret;
-    stat->isReturn->exp = parse_expression(tokenList, startIndex); 
+    Return* stat = new Return;
+    stat->exp = parse_expression(tokenList, startIndex); 
     if(tokenList[startIndex + 1] != ";"){
         return nullptr;
     }
     startIndex+= 1;
-    stat->isReturn->active = true;
+    stat->active = true;
     return stat;
 }
 
-keyword* parse(vector<string> tokenList){
+Function* parse(vector<string> tokenList){
     
-    keyword* root = new keyword;
+    Function* root = new Function;
     if(tokenList.size() < 6){
         cout<<"tokenList too small"<<endl;
         return nullptr;
@@ -575,12 +505,12 @@ keyword* parse(vector<string> tokenList){
         cout<<"missing openinig curly bracket"<<endl;
         return nullptr;
     }
-    root->isFunction = new Function;
-    root->isFunction->name = tokenList[1];
-    root->isFunction->active = true;
+    
+    root->name = tokenList[1];
+    root->active = true;
     int index = 5;
-    root->isFunction->statement = parse_statement(tokenList, index);
-    if(!root->isFunction->statement){
+    root->statement = parse_statement(tokenList, index);
+    if(!root->statement){
         cout<<"function does not contain a valid statement"<<endl;
         return nullptr;
     }
@@ -780,18 +710,18 @@ void write_expression(expression* exp,bool first, ofstream& outFile){
         write_expression(exp->next_exp,!first, outFile);
     }
 }
-void write_statement(keyword* stat, int indent, ofstream& outFile){
-    if(!stat || !stat->isReturn->active){
+void write_statement(Return* stat, int indent, ofstream& outFile){
+    if(!stat || !stat->active){
         return;
     }
-    write_expression(stat->isReturn->exp,true, outFile);
+    write_expression(stat->exp,true, outFile);
 }
 
-void write_asm(keyword* root){
+void write_asm(Function* root){
     if(!root){
         return;
     }
-    if(!root->isFunction->active){
+    if(!root->active){
         cout<<"root does not contain a funcition"<<endl;
         return;
     }
@@ -801,11 +731,11 @@ void write_asm(keyword* root){
         return;
     }
     //this writes .global _<function name>
-    outFile<<" .global " << root->isFunction->name<<endl;
-    outFile<<root->isFunction->name<<":"<<endl;
+    outFile<<" .global " << root->name<<endl;
+    outFile<<root->name<<":"<<endl;
 
     int indent = 1;
-    write_statement(root->isFunction->statement, indent, outFile);
+    write_statement(root->statement, indent, outFile);
     outFile<<"ret"<<endl;
 }
 
@@ -833,7 +763,7 @@ int main(int argc, char *argv[]){
     for(int i = 0; i < tokenList.size(); i++){
         cout<<tokenList[i]<<endl;
     }
-    keyword* root = parse(tokenList);
+    Function* root = parse(tokenList);
     if(!root){
         cout<<"\033[1;31merrore nel parser\033[0m\n";
         return EXIT_FAILURE;
