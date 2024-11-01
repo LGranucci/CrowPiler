@@ -4,7 +4,6 @@
 #include <stdlib.h> 
 #include "compiler.h"
 using namespace std;
-//prova!
 
 vector<string> lex(ifstream& myread){
     std::string myText;
@@ -327,8 +326,8 @@ Factor* parse_factor(vector<string> tokenList, int& startIndex){
         fact->next_fact = next;
     }
     //if an integer
-    else if(numbers.find(tokenList[startIndex][0]) != string::npos){
-        fact->value = stoi(tokenList[startIndex]);
+    else if(numbers.find(tokenList[startIndex - 1][0]) != string::npos){
+        fact->value = stoi(tokenList[startIndex - 1]);
     }
     else{
         //sto assumendo che qualunque id sia valido
@@ -549,10 +548,12 @@ Statement* parse_statement(vector<string> tokenList, int& startIndex){
     }
     
     stat->exp = parse_expression(tokenList, startIndex); 
-    if(tokenList[startIndex + 1] != ";"){
+    if(tokenList[startIndex + 1] != ";" && tokenList[startIndex] != ";"){
         return nullptr;
     }
-    startIndex+= 1;
+    if(tokenList[startIndex + 1] == ";"){
+        startIndex++;
+    }
     stat->active = true;
     return stat;
 }
@@ -564,6 +565,7 @@ Function* parse(vector<string> tokenList){
         cout<<"tokenList too small"<<endl;
         return nullptr;
     }
+
     if(tokenList[0] != "INT_KW"){
         cout<<"function declaration does not start with int"<<endl;
         return nullptr;

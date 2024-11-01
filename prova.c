@@ -1,4 +1,6 @@
 int main(){
-    int a = 3 + 2;
+    int a;
+    int b = 3 + 5;
+    33;
     return 1 && 0 || 1;
 }
