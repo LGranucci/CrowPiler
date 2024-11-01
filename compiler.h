@@ -49,6 +49,9 @@ struct EqualityExp{
     char op;
     EqualityExp() : next_eq(nullptr), rel(nullptr), op('Z'){};
 };
+
+
+
 struct LogicalExp{
     LogicalExp* next_log;
     EqualityExp* equal;
@@ -66,21 +69,26 @@ struct LogicalOrExp{
 
 
 struct expression{
-    LogicalExp* logic;
+    LogicalOrExp* logic;
     expression* next_exp;
-    expression() : logic(nullptr),next_exp(nullptr){};
+    string id;
+    expression() : logic(nullptr),next_exp(nullptr),id(""){};
 };
 
 struct Statement{
     expression* exp;
-    
+    Statement* next_statement;
+    string id;
     bool active;
-    Statement() : active(false){};
+    bool isReturn;
+    bool isDeclaration;
+    Statement() : active(false),exp(nullptr),next_statement(nullptr),isReturn(false),id(""){};
+
 };
 
 struct Function{
     string name;
     Statement* statement;
     bool active;
-    Function() : active(false){};
+    Function() : active(false),statement(nullptr){};
 };

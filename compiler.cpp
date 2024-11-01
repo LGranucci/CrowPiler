@@ -144,8 +144,12 @@ void pprint_fact(Factor* fact){
         pprint_fact(fact->next_fact);
         return;
     }
-    else{
+    else if(fact->id == ""){
         cout<<fact->value<<endl;
+        return;
+    }
+    else{
+        cout<<fact->id<<endl;
         return;
     }
 
@@ -215,17 +219,59 @@ void pprint_logic(LogicalExp* logic){
 
     }
 }
+void pprint_or(LogicalOrExp* orexp){
+    cout<<"OR LOGICO ";
+    if(orexp->and_exp){
+        pprint_logic(orexp->and_exp);
+    
+    }
+    if(orexp->next_or){
+        cout<<" || ";
+        pprint_or(orexp->next_or);
+
+    }
+}
+
 
 void pprint_expr(expression* exp){
     cout<<"EXPRESSION ";
     if(exp->logic){
-        pprint_logic(exp->logic);
+        pprint_or(exp->logic);
         if(!exp->next_exp){
             return;
         }
-        cout<<" || ";
+        cout<<" altra exp, con id " << exp->id;
         pprint_expr(exp->next_exp);
     }
+}
+
+void pprint_statement(Statement* stat){
+    cout<<"STATMENT";
+    if(stat->isDeclaration){
+            cout<<"DICHIARAZIONE: int" << stat->id;
+            if(stat->exp){
+                cout<< "= ";
+                pprint_expr(stat->exp);
+                
+            }
+    }
+    else if(!stat->exp){
+        cerr<<"no expression"<<endl;
+        return;
+    }
+    else if(stat->isReturn){
+        cout<<"RETURN";
+        pprint_expr(stat->exp);
+    }
+    else{
+        cout<<"RIGA";
+        pprint_expr(stat->exp);
+    }
+    
+    if(stat->next_statement){
+        pprint_statement(stat->next_statement);
+    }
+    return;
 }
 
 void pretty_printer(Function* root){
@@ -238,15 +284,9 @@ void pretty_printer(Function* root){
     if(!root->statement->active){
         return;
     }
-    Statement* ret = root->statement;
-    cout<<"RETURN "<<endl;
-    if(!ret->exp){
-        cerr<<"expression not present"<<endl;
-        return;
-    }
-    expression* expr = ret->exp;
-    pprint_expr(expr);
     
+    pprint_statement(root->statement);
+
     return;
 }
 
@@ -290,6 +330,10 @@ Factor* parse_factor(vector<string> tokenList, int& startIndex){
     else if(numbers.find(tokenList[startIndex][0]) != string::npos){
         fact->value = stoi(tokenList[startIndex]);
     }
+    else{
+        //sto assumendo che qualunque id sia valido
+        fact->id = tokenList[startIndex];
+    } 
     return fact;
 }
 
@@ -425,34 +469,49 @@ LogicalExp* parse_logical(vector<string> tokenList, int& startIndex){
     return logic;
 
 }
+LogicalOrExp* parse_logical_or(vector<string> tokenList, int& startIndex){
+    LogicalOrExp* or_exp = new LogicalOrExp;
+    LogicalExp* and_exp = parse_logical(tokenList, startIndex);
+    or_exp->and_exp = and_exp;
+    while(tokenList.size() > (startIndex + 1) && (tokenList[startIndex + 1] == "||")){
+        //there is another logicalExp
+        startIndex++;
+        and_exp = parse_logical(tokenList, startIndex);
+        
+        LogicalOrExp* auxexp = new LogicalOrExp;
+        auxexp->and_exp = and_exp;
+      
+        
+        //insert at end of list
+        if(!or_exp->next_or){
+            or_exp->next_or = auxexp;
+        }
+        else{
+            LogicalOrExp* aux = or_exp->next_or;
+            while(aux->next_or){
+                aux = aux->next_or;
+            }
+            aux->next_or = auxexp;
+        }
+    }
+    return or_exp;
+
+}
+
 
 expression* parse_expression(vector<string> tokenList, int& startIndex){
     //se sono arrivato ad un integer
     expression* exp = new expression;
-    LogicalExp* logic = parse_logical(tokenList, startIndex);
-    exp->logic = logic;
-    while(tokenList.size() > (startIndex + 1) && (tokenList[startIndex + 1] == "||")){
-        //there is another logicalExp
-        startIndex++;
-        logic = parse_logical(tokenList, startIndex);
-        
-        expression* auxexp = new expression;
-        auxexp->logic = logic;
-      
-        
-        //insert at end of list
-        if(!exp->next_exp){
-            exp->next_exp = auxexp;
-        }
-        else{
-            expression* aux = exp->next_exp;
-            while(aux->next_exp){
-                aux = aux->next_exp;
-            }
-            aux->next_exp = auxexp;
-        }
+    if(tokenList.size() >= startIndex + 2 && tokenList[startIndex + 2] == "="){
+        exp->id = tokenList[startIndex + 1];
+        startIndex += 2;
+        exp->next_exp = parse_expression(tokenList,startIndex);
+        return exp;
     }
+    LogicalOrExp* logic = parse_logical_or(tokenList, startIndex);
+    exp->logic = logic;
     return exp;
+    
 }
 /**
  * @brief parses a statement, which (for now) can only be of type `return <operation>`
@@ -464,11 +523,31 @@ Statement* parse_statement(vector<string> tokenList, int& startIndex){
     if(tokenList.size()  <= (startIndex + 2)){
         return nullptr;
     }
-    if(tokenList[startIndex] != "RETURN_KW"){
-        return nullptr;
-    }
-   
+
     Statement* stat = new Statement;
+    stat->isReturn = false;
+    stat->isDeclaration = false;
+    if(tokenList[startIndex] == "RETURN_KW"){
+        //startIndex++?
+        stat->isReturn = true;
+    }
+    if(tokenList[startIndex] == "INT_KW"){
+        stat->isDeclaration = true;
+        startIndex++;
+        
+        //for now I just assume it is a valid name
+        stat->id = tokenList[startIndex];
+        if(tokenList[startIndex + 1] != "="){
+            if(tokenList[startIndex + 1] != ";"){
+                return nullptr;
+            }
+            startIndex++;
+            stat->active = true;
+            return stat;
+        }
+        startIndex++;
+    }
+    
     stat->exp = parse_expression(tokenList, startIndex); 
     if(tokenList[startIndex + 1] != ";"){
         return nullptr;
@@ -510,14 +589,31 @@ Function* parse(vector<string> tokenList){
     root->active = true;
     int index = 5;
     root->statement = parse_statement(tokenList, index);
+    
+    
+    while(tokenList.size() > index + 1 && tokenList[index + 1] != "}"){
+        index++;
+        Statement* st = new Statement;
+        st = parse_statement(tokenList, index);
+        Function* auxexp = new Function;
+        
+        
+        //insert at end of list
+        if(!root->statement->next_statement){
+            root->statement->next_statement = st;
+        }
+        else{
+            Statement* aux = root->statement->next_statement;
+            while(aux->next_statement){
+                aux = aux->next_statement;
+            }
+            aux->next_statement = st;
+        }
+    }
+
     if(!root->statement){
         cout<<"function does not contain a valid statement"<<endl;
         return nullptr;
-    }
-    if(tokenList.size() <= index + 1){
-        cout<<"tokenList too small"<<endl;
-        return nullptr;
-
     }
     if(tokenList[index + 1] != "}"){
         cout<<"missing closing bracket"<<endl;
@@ -540,6 +636,8 @@ int auxLabel = 0;
 string generate_label(string type){
     return type + "_" + to_string(auxLabel++); 
 }
+
+/*
 void write_expression(expression*,bool, ofstream&);
 
 
@@ -738,7 +836,7 @@ void write_asm(Function* root){
     write_statement(root->statement, indent, outFile);
     outFile<<"ret"<<endl;
 }
-
+*/
 
 
 
@@ -769,8 +867,8 @@ int main(int argc, char *argv[]){
         return EXIT_FAILURE;
     }
     pretty_printer(root);
-    write_asm(root);
-    system("g++ -g out.s -o out");
+    //write_asm(root);
+    //system("g++ -g out.s -o out");
     return 0;
 }
 
