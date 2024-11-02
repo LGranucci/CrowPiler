@@ -1,6 +1,4 @@
 int main(){
-    int a;
-    int b = 3 + 5;
-    33;
-    return 1 && 0 || 1;
+    int a = 2;
+    return (a + 5) * 2;
 }

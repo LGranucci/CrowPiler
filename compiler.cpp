@@ -3,6 +3,7 @@
 #include <vector>
 #include <stdlib.h> 
 #include "compiler.h"
+#include <map>
 using namespace std;
 
 vector<string> lex(ifstream& myread){
@@ -308,8 +309,9 @@ Factor* parse_factor(vector<string> tokenList, int& startIndex){
     if(tokenList.size() < startIndex + 1){
         return nullptr;
     }
-    startIndex++;
+    
     if(tokenList[startIndex][0] == '('){
+        startIndex++;
         expression* exp = parse_expression(tokenList, startIndex);
         if(!exp) return nullptr;
         startIndex++;
@@ -326,8 +328,8 @@ Factor* parse_factor(vector<string> tokenList, int& startIndex){
         fact->next_fact = next;
     }
     //if an integer
-    else if(numbers.find(tokenList[startIndex - 1][0]) != string::npos){
-        fact->value = stoi(tokenList[startIndex - 1]);
+    else if(numbers.find(tokenList[startIndex][0]) != string::npos){
+        fact->value = stoi(tokenList[startIndex]);
     }
     else{
         //sto assumendo che qualunque id sia valido
@@ -344,7 +346,7 @@ Term* parse_term(vector<string> tokenList, int& startIndex){
     while(tokenList.size() > (startIndex + 1) && (tokenList[startIndex + 1] == "*" || tokenList[startIndex + 1] == "/")){
         startIndex++;
         char op = tokenList[startIndex][0];
-        
+        startIndex++;
         first_factor = parse_factor(tokenList, startIndex);
         Term* auxTerm = new Term;
         auxTerm->factorList = first_factor;
@@ -370,6 +372,7 @@ AdditiveExp* parse_add(vector<string> tokenList, int& startIndex){
     while(tokenList.size() > (startIndex + 1) && (tokenList[startIndex + 1] == "+" || tokenList[startIndex + 1] == "-")){
         startIndex++;
         char op = tokenList[startIndex][0];
+        startIndex++;
         term = parse_term(tokenList, startIndex);
         AdditiveExp* auxAdd = new AdditiveExp;
         auxAdd->next_add = nullptr;
@@ -396,6 +399,7 @@ RelationalExp* parse_rel(vector<string> tokenList, int& startIndex){
     while(tokenList.size() > (startIndex + 1) && (tokenList[startIndex + 1] == "<" || tokenList[startIndex + 1] == ">" || tokenList[startIndex + 1] == "<=" || tokenList[startIndex + 1]== ">=")){
         startIndex++;
         string op = tokenList[startIndex];
+        startIndex++;
         add = parse_add(tokenList, startIndex);
         RelationalExp* auxRel = new RelationalExp;
         auxRel->add = add;
@@ -425,6 +429,7 @@ EqualityExp* parse_equal(vector<string> tokenList, int& startIndex){
     while(tokenList.size() > (startIndex + 1) && (tokenList[startIndex + 1] == "!=" || tokenList[startIndex + 1] == "==")){
         startIndex++;
         char op = tokenList[startIndex][0];
+        startIndex++;
         rel = parse_rel(tokenList, startIndex);
         EqualityExp* auxEq = new EqualityExp;
         auxEq->rel = rel;
@@ -450,8 +455,9 @@ LogicalExp* parse_logical(vector<string> tokenList, int& startIndex){
     EqualityExp* eq = parse_equal(tokenList, startIndex);
     logic->equal = eq;
     while(tokenList.size() > (startIndex + 1) && (tokenList[startIndex + 1] == "&&")){
-        startIndex++;
+        startIndex+= 2;
         eq = parse_equal(tokenList, startIndex);
+
         LogicalExp* auxlog = new LogicalExp;
         auxlog->equal = eq;
         if(!logic->next_log){
@@ -474,7 +480,7 @@ LogicalOrExp* parse_logical_or(vector<string> tokenList, int& startIndex){
     or_exp->and_exp = and_exp;
     while(tokenList.size() > (startIndex + 1) && (tokenList[startIndex + 1] == "||")){
         //there is another logicalExp
-        startIndex++;
+        startIndex+= 2;
         and_exp = parse_logical(tokenList, startIndex);
         
         LogicalOrExp* auxexp = new LogicalOrExp;
@@ -501,12 +507,14 @@ LogicalOrExp* parse_logical_or(vector<string> tokenList, int& startIndex){
 expression* parse_expression(vector<string> tokenList, int& startIndex){
     //se sono arrivato ad un integer
     expression* exp = new expression;
+    
     if(tokenList.size() >= startIndex + 2 && tokenList[startIndex + 2] == "="){
         exp->id = tokenList[startIndex + 1];
         startIndex += 2;
         exp->next_exp = parse_expression(tokenList,startIndex);
         return exp;
     }
+
     LogicalOrExp* logic = parse_logical_or(tokenList, startIndex);
     exp->logic = logic;
     return exp;
@@ -527,7 +535,7 @@ Statement* parse_statement(vector<string> tokenList, int& startIndex){
     stat->isReturn = false;
     stat->isDeclaration = false;
     if(tokenList[startIndex] == "RETURN_KW"){
-        //startIndex++?
+        startIndex++;
         stat->isReturn = true;
     }
     if(tokenList[startIndex] == "INT_KW"){
@@ -544,7 +552,7 @@ Statement* parse_statement(vector<string> tokenList, int& startIndex){
             stat->active = true;
             return stat;
         }
-        startIndex++;
+        startIndex+= 2;
     }
     
     stat->exp = parse_expression(tokenList, startIndex); 
@@ -638,16 +646,22 @@ int auxLabel = 0;
 string generate_label(string type){
     return type + "_" + to_string(auxLabel++); 
 }
+int stackIndex = 0;
+map<std::string, int> var_map;
 
-/*
 void write_expression(expression*,bool, ofstream&);
 
 
 void write_factor(Factor* fact, ofstream& outFile){
-    if(!fact->exp && !fact->next_fact && fact->un_op == 'Z'){
+    if(!fact->exp && !fact->next_fact && fact->un_op == 'Z' && fact->id == ""){
         outFile<<"movq $" << fact->value <<", %rax"<<endl;
         return;
     }
+    else if(fact->id != ""){
+        int var_offset = var_map[fact->id];
+        outFile<<"movq "<<stackIndex<<"(\%rbp), \%rax"<<endl;
+    }
+
     if(fact->exp){
         write_expression(fact->exp,true, outFile);
     }
@@ -665,6 +679,7 @@ void write_factor(Factor* fact, ofstream& outFile){
     if(fact->un_op == '~'){
         outFile<<"not %rax"<<endl;
     }
+    
 }
 
 void write_term(Term* term, ofstream& outFile){
@@ -784,11 +799,11 @@ void write_logic_and(LogicalExp* lexp,bool first, ofstream& outFile){
         write_logic_and(lexp->next_log, !first, outFile);
     }
 }
-
 string labelEndOr;
-void write_expression(expression* exp,bool first, ofstream& outFile){
-    write_logic_and(exp->logic,true, outFile);
-    if(first && exp->next_exp){
+
+void write_logic_or(LogicalOrExp* exp, bool first, ofstream& outFile){
+    write_logic_and(exp->and_exp,true, outFile);
+    if(first && exp->next_or){
         outFile<< "cmpq $0, %rax"<<endl;
         string label = generate_label("clause");
         outFile<< "je "<< label<<endl;
@@ -805,16 +820,52 @@ void write_expression(expression* exp,bool first, ofstream& outFile){
         outFile<<labelEndOr << ':'<<endl;    
     }
     
-    if(exp->next_exp){
+    if(exp->next_or){
        
-        write_expression(exp->next_exp,!first, outFile);
+        write_logic_or(exp->next_or,!first, outFile);
     }
+}
+void write_expression(expression* exp,bool first, ofstream& outFile){
+
+    if(exp->id != ""){
+        if(var_map.find(exp->id) == var_map.end()){
+            cerr<<"variabile non dichiarata"<<endl;
+            return;
+        }
+        int var_offset = var_map[exp->id];
+        write_expression(exp->next_exp, true, outFile);
+        
+        outFile<<"movq \%rax, "<<var_offset<<"(\%rbp)"<<endl;
+        return;
+    }
+    write_logic_or(exp->logic, true, outFile);   
 }
 void write_statement(Statement* stat, int indent, ofstream& outFile){
     if(!stat || !stat->active){
         return;
     }
-    write_expression(stat->exp,true, outFile);
+    if(stat->isDeclaration){
+        //se la variabile esiste già
+        if(var_map.find(stat->id) != var_map.end()){
+            cerr<<"var già dichiarata"<<endl;
+            return;
+        }
+        if(stat->exp){
+            write_expression(stat->exp, true, outFile);
+        }
+        else{
+            outFile<<"movq $0, \%rax"<<endl;
+        }
+        outFile<<"push \%rax"<<endl;
+        var_map[stat->id] = stackIndex;
+        stackIndex -= 8;
+    }
+    else{
+        write_expression(stat->exp,true, outFile);
+    }
+    if(stat->next_statement){
+        write_statement(stat->next_statement, 1, outFile);
+    }
 }
 
 void write_asm(Function* root){
@@ -835,10 +886,15 @@ void write_asm(Function* root){
     outFile<<root->name<<":"<<endl;
 
     int indent = 1;
+    outFile<<"push %rbp"<<endl;
+    outFile<<"movq %rsp, %rbp"<<endl;
+    
     write_statement(root->statement, indent, outFile);
+    outFile<<"movq %rbp, %rsp"<<endl;
+    outFile<<"pop %rbp"<<endl;
     outFile<<"ret"<<endl;
 }
-*/
+
 
 
 
@@ -869,8 +925,8 @@ int main(int argc, char *argv[]){
         return EXIT_FAILURE;
     }
     pretty_printer(root);
-    //write_asm(root);
-    //system("g++ -g out.s -o out");
+    write_asm(root);
+    system("g++ -g -O0 out.s -o out");
     return 0;
 }
 
