@@ -659,7 +659,7 @@ void write_factor(Factor* fact, ofstream& outFile){
     }
     else if(fact->id != ""){
         int var_offset = var_map[fact->id];
-        outFile<<"movq "<<stackIndex<<"(\%rbp), \%rax"<<endl;
+        outFile<<"movq "<<var_offset<<"(\%rbp), \%rax"<<endl;
     }
 
     if(fact->exp){
@@ -857,8 +857,9 @@ void write_statement(Statement* stat, int indent, ofstream& outFile){
             outFile<<"movq $0, \%rax"<<endl;
         }
         outFile<<"push \%rax"<<endl;
-        var_map[stat->id] = stackIndex;
         stackIndex -= 8;
+        var_map[stat->id] = stackIndex;
+        
     }
     else{
         write_expression(stat->exp,true, outFile);
