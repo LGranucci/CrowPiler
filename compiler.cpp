@@ -14,7 +14,7 @@ vector<string> lex(ifstream& myread){
     while(std::getline(myread, myText)){
         for(int i = 0; i < myText.length(); i++){
             if(myText[i] == '{' || myText[i] == '}' || myText[i] == '(' || myText[i] == ')' || myText[i] == ';' || myText[i] == '-' || myText[i] == '~'  
-              || myText[i] == '+' || myText[i] == '/' || myText[i] == '*'){
+              || myText[i] == '+' || myText[i] == '/' || myText[i] == '*' || myText[i] == ':' || myText[i] == '?'){
                 
                 string aux(1, myText[i]);
                 tokenList.push_back(aux);
@@ -88,6 +88,12 @@ vector<string> lex(ifstream& myread){
                         continue;
                     }
                 }
+                else{
+                    if(myText[i + 1] = 'f'){
+                        tokenList.push_back("if");
+                        i++;
+                    }
+                }
             }
             else if(myText[i] == 'r' && myText.length() > i + 5){
                 std::string aux = myText.substr(i, 6);
@@ -97,6 +103,14 @@ vector<string> lex(ifstream& myread){
                         i+= 5;
                         continue;
                     }
+                }
+            }
+            else if(myText[i] == 'e' && myText.length() > i + 4){
+                string aux = myText.substr(i,5);
+                if(aux == "else"){
+                    tokenList.push_back("else");
+                    i+= 4;
+                    continue;
                 }
             }
             if((alphabet.find(myText[i]) != string::npos)){
@@ -508,8 +522,8 @@ expression* parse_expression(vector<string> tokenList, int& startIndex){
     //se sono arrivato ad un integer
     expression* exp = new expression;
     
-    if(tokenList.size() >= startIndex + 2 && tokenList[startIndex + 2] == "="){
-        exp->id = tokenList[startIndex + 1];
+    if(tokenList.size() >= startIndex + 1 && tokenList[startIndex + 1] == "="){
+        exp->id = tokenList[startIndex];
         startIndex += 2;
         exp->next_exp = parse_expression(tokenList,startIndex);
         return exp;
@@ -834,7 +848,7 @@ void write_expression(expression* exp,bool first, ofstream& outFile){
         }
         int var_offset = var_map[exp->id];
         write_expression(exp->next_exp, true, outFile);
-        
+        //not executed
         outFile<<"movq \%rax, "<<var_offset<<"(\%rbp)"<<endl;
         return;
     }

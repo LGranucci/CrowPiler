@@ -75,17 +75,32 @@ struct expression{
     expression() : logic(nullptr),next_exp(nullptr),id(""){};
 };
 
+
 struct Statement{
     expression* exp;
     Statement* next_statement;
+    Statement* first_if;
+    Statement* second_if;
     string id;
+    bool isIf;
     bool active;
     bool isReturn;
     bool isDeclaration;
-    Statement() : active(false),exp(nullptr),next_statement(nullptr),isReturn(false),id(""){};
+    Statement() : active(false),exp(nullptr),next_statement(nullptr),isReturn(false),id(""),isIf(false), first_if(nullptr), second_if(nullptr){};
 
 };
 
+struct Declaration{
+    string id;
+    expression* exp;
+    Declaration() : id(""), exp(nullptr){};
+};
+
+struct BlockItem{
+    Statement* stat;
+    Declaration* decl;
+    BlockItem() : stat(nullptr), decl(nullptr){};
+};
 struct Function{
     string name;
     Statement* statement;
