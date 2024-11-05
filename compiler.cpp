@@ -564,13 +564,14 @@ LogicalOrExp* parse_logical_or(vector<string> tokenList, int& startIndex){
 ConditionalExp* parse_conditional(vector<string> tokenList, int& startIndex){
     ConditionalExp* cond = new ConditionalExp;
     cond->logic = parse_logical_or(tokenList, startIndex);
-    if(tokenList[startIndex] != "?"){
+    
+    if(tokenList[startIndex + 1] != "?"){
         return cond;
     }
-    startIndex++;
+    startIndex+= 2;
     cond->exp = parse_expression(tokenList, startIndex);
-    if(tokenList[startIndex] == ":"){
-        startIndex++;
+    if(tokenList[startIndex + 1] == ":"){
+        startIndex+= 2;
         cond->cond = parse_conditional(tokenList, startIndex);
         return cond;
     }
