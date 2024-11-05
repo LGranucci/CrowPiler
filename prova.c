@@ -6,5 +6,8 @@ int main(){
         a = 8;
     else 
         a = 6;
-    return a;
+    int b = 5;
+    if(a == 6)
+        b = 7;
+    return a + b;
 }

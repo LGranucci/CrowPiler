@@ -635,9 +635,7 @@ Statement* parse_statement(vector<string> tokenList, int& startIndex){
             startIndex++;
             stat->second_if = parse_statement(tokenList, startIndex); 
         }
-        if(tokenList[startIndex] != ";"){
-            return nullptr;
-        }
+        
         return stat;
     }
     
