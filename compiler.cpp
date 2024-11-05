@@ -92,6 +92,7 @@ vector<string> lex(ifstream& myread){
                     if(myText[i + 1] = 'f'){
                         tokenList.push_back("if");
                         i++;
+                        continue;
                     }
                 }
             }
@@ -245,35 +246,59 @@ void pprint_or(LogicalOrExp* orexp){
 
     }
 }
-
+void pprint_cond(ConditionalExp* cond){
+    cout<<"COND";
+    if(!cond->logic){
+        return;
+    }
+    pprint_or(cond->logic);
+    if(cond->exp){
+        cout<<" ? ";
+        pprint_expr(cond->exp);
+        cout<<" : ";
+        if(!cond->cond){
+            return;
+        }
+        pprint_cond(cond->cond);
+    }
+}
 
 void pprint_expr(expression* exp){
     cout<<"EXPRESSION ";
-    if(exp->logic){
-        pprint_or(exp->logic);
+    if(exp->id != ""){
+        cout<<exp->id;
         if(!exp->next_exp){
             return;
         }
-        cout<<" altra exp, con id " << exp->id;
         pprint_expr(exp->next_exp);
+    }
+    else{
+        pprint_cond(exp->cond);
     }
 }
 
 void pprint_statement(Statement* stat){
     cout<<"STATMENT";
-    if(stat->isDeclaration){
-            cout<<"DICHIARAZIONE: int" << stat->id;
-            if(stat->exp){
-                cout<< "= ";
-                pprint_expr(stat->exp);
-                
-            }
+    if(stat->isIf){
+        cout<<"IF";
+        if(!stat->exp){
+            cerr<<"no exp";
+            return;
+        }
+        pprint_expr(stat->exp);
+        if(!stat->first_if){
+            cerr<<"no first if"<<endl;
+            return;
+        }
+        pprint_statement(stat->first_if);
+        if(stat->second_if){
+            cout<<"ELSE";
+            pprint_statement(stat->second_if);
+
+        }
     }
-    else if(!stat->exp){
-        cerr<<"no expression"<<endl;
-        return;
-    }
-    else if(stat->isReturn){
+    
+    if(stat->isReturn){
         cout<<"RETURN";
         pprint_expr(stat->exp);
     }
@@ -287,7 +312,29 @@ void pprint_statement(Statement* stat){
     }
     return;
 }
+void pprint_decl(Declaration* decl){
+    cout<<"DECL with id = "<<decl->id;
+    
+    if(decl->exp){
+        pprint_expr(decl->exp);
+    }
+}
 
+
+void pprint_block(BlockItem* block){
+    cout<<"BLOCK ";
+    if(block->stat){
+        cout<<"isStatement";
+        pprint_statement(block->stat);
+    }
+    else{
+        cout<<"is Declaration";
+        pprint_decl(block->decl);
+    }
+    if(block->next_blockItem)
+        pprint_block(block->next_blockItem);
+    return;
+}
 void pretty_printer(Function* root){
     if(root->active){
         cout<<"FUNCTION "<<"\""<<root->name<<"\""<<endl;
@@ -295,11 +342,9 @@ void pretty_printer(Function* root){
     else{
         return;
     }
-    if(!root->statement->active){
-        return;
-    }
     
-    pprint_statement(root->statement);
+    
+    pprint_block(root->statement);
 
     return;
 }
@@ -516,7 +561,23 @@ LogicalOrExp* parse_logical_or(vector<string> tokenList, int& startIndex){
     return or_exp;
 
 }
-
+ConditionalExp* parse_conditional(vector<string> tokenList, int& startIndex){
+    ConditionalExp* cond = new ConditionalExp;
+    cond->logic = parse_logical_or(tokenList, startIndex);
+    if(tokenList[startIndex] != "?"){
+        return cond;
+    }
+    startIndex++;
+    cond->exp = parse_expression(tokenList, startIndex);
+    if(tokenList[startIndex] == ":"){
+        startIndex++;
+        cond->cond = parse_conditional(tokenList, startIndex);
+        return cond;
+    }
+    else{
+        return nullptr;
+    }
+}
 
 expression* parse_expression(vector<string> tokenList, int& startIndex){
     //se sono arrivato ad un integer
@@ -529,8 +590,8 @@ expression* parse_expression(vector<string> tokenList, int& startIndex){
         return exp;
     }
 
-    LogicalOrExp* logic = parse_logical_or(tokenList, startIndex);
-    exp->logic = logic;
+    ConditionalExp* cond = parse_conditional(tokenList, startIndex);
+    exp->cond = cond;
     return exp;
     
 }
@@ -547,38 +608,87 @@ Statement* parse_statement(vector<string> tokenList, int& startIndex){
 
     Statement* stat = new Statement;
     stat->isReturn = false;
-    stat->isDeclaration = false;
+    
     if(tokenList[startIndex] == "RETURN_KW"){
         startIndex++;
         stat->isReturn = true;
     }
-    if(tokenList[startIndex] == "INT_KW"){
-        stat->isDeclaration = true;
-        startIndex++;
-        
-        //for now I just assume it is a valid name
-        stat->id = tokenList[startIndex];
-        if(tokenList[startIndex + 1] != "="){
-            if(tokenList[startIndex + 1] != ";"){
-                return nullptr;
-            }
-            startIndex++;
-            stat->active = true;
-            return stat;
+    if(tokenList[startIndex] == "if"){
+        stat->isIf = true;
+        if(tokenList[startIndex + 1] != "("){
+            return nullptr;
         }
         startIndex+= 2;
+        stat->exp = parse_expression(tokenList, startIndex);
+        startIndex++;
+        if(tokenList[startIndex] != ")" ){
+            return nullptr;
+        }
+        startIndex++;
+      
+        stat->first_if = parse_statement(tokenList, startIndex);
+        if(tokenList[startIndex] != ";"){
+            return nullptr;
+        }
+        startIndex++;
+        if(tokenList[startIndex] == "else"){
+            startIndex++;
+            stat->second_if = parse_statement(tokenList, startIndex); 
+        }
+        if(tokenList[startIndex] != ";"){
+            return nullptr;
+        }
+        return stat;
     }
     
     stat->exp = parse_expression(tokenList, startIndex); 
+     
     if(tokenList[startIndex + 1] != ";" && tokenList[startIndex] != ";"){
         return nullptr;
     }
     if(tokenList[startIndex + 1] == ";"){
         startIndex++;
     }
+    
     stat->active = true;
     return stat;
 }
+Declaration* parse_declaration(vector<string> tokenList, int& startIndex){
+    Declaration* dec = new Declaration;
+    startIndex++;
+        
+        //for now I just assume it is a valid name
+    dec->id = tokenList[startIndex];
+    if(tokenList[startIndex + 1] != "="){
+        if(tokenList[startIndex + 1] != ";"){
+            return nullptr;
+        }
+        startIndex++;
+        return dec;
+    }
+    startIndex+= 2;
+    dec->exp = parse_expression(tokenList, startIndex);
+     if(tokenList[startIndex + 1] != ";" && tokenList[startIndex] != ";"){
+        return nullptr;
+    }
+    if(tokenList[startIndex + 1] == ";"){
+        startIndex++;
+    }
+    return dec;
+}
+
+
+BlockItem* parse_blockItem(vector<string> tokenList, int& startIndex){
+    BlockItem* bl = new BlockItem;
+    if(tokenList[startIndex] == "INT_KW"){
+        bl->decl = parse_declaration(tokenList, startIndex);
+    }
+    else{
+        bl->stat = parse_statement(tokenList, startIndex);
+    }
+    return bl;
+}
+
 
 Function* parse(vector<string> tokenList){
     
@@ -612,26 +722,26 @@ Function* parse(vector<string> tokenList){
     root->name = tokenList[1];
     root->active = true;
     int index = 5;
-    root->statement = parse_statement(tokenList, index);
+    root->statement = parse_blockItem(tokenList, index);
     
     
     while(tokenList.size() > index + 1 && tokenList[index + 1] != "}"){
         index++;
-        Statement* st = new Statement;
-        st = parse_statement(tokenList, index);
+        BlockItem* st = new BlockItem;
+        st = parse_blockItem(tokenList, index);
         Function* auxexp = new Function;
         
         
         //insert at end of list
-        if(!root->statement->next_statement){
-            root->statement->next_statement = st;
+        if(!root->statement->next_blockItem){
+            root->statement->next_blockItem = st;
         }
         else{
-            Statement* aux = root->statement->next_statement;
-            while(aux->next_statement){
-                aux = aux->next_statement;
+            BlockItem* aux = root->statement->next_blockItem;
+            while(aux->next_blockItem){
+                aux = aux->next_blockItem;
             }
-            aux->next_statement = st;
+            aux->next_blockItem = st;
         }
     }
 
@@ -773,17 +883,17 @@ void write_equality_exp(EqualityExp* eexp, ofstream& outFile){
         outFile<<"pop %rcx"<<endl;
     }
     if(eexp->op == '='){
-        outFile<<"cmpq %rcx, %rcx"<<endl;
+        outFile<<"cmpq %rax, %rcx"<<endl;
         outFile<<"movq $0, %rax"<<endl;
         outFile<<"sete \%al"<<endl;
     }
     if(eexp->op == '!'){
-        outFile<<"cmpq %rcx, %rcx"<<endl;
+        outFile<<"cmpq %rax, %rcx"<<endl;
         outFile<<"movq $0, %rax"<<endl;
         outFile<<"setne \%al"<<endl;
     }
     if(eexp->next_eq){
-        outFile<<"push %rax";
+        outFile<<"push %rax"<<endl;
         write_equality_exp(eexp->next_eq, outFile);
     }
 
@@ -839,6 +949,23 @@ void write_logic_or(LogicalOrExp* exp, bool first, ofstream& outFile){
         write_logic_or(exp->next_or,!first, outFile);
     }
 }
+
+void write_conditional_exp(ConditionalExp* cond, ofstream& outFile){
+    write_logic_or(cond->logic, true, outFile);
+    if(cond->exp){
+        outFile<<"cmpq $0, %rax"<<endl;
+        string lab = generate_label("e");
+        outFile<<"je "<< lab<<endl;
+        write_expression(cond->exp, true, outFile);
+        string post = generate_label("post_conditional");
+        outFile<<"jmp "<<post<<endl;
+
+        outFile<<lab<<":"<<endl;
+        write_conditional_exp(cond->cond, outFile);
+        outFile<<post<<":"<<endl;
+    }
+}
+
 void write_expression(expression* exp,bool first, ofstream& outFile){
 
     if(exp->id != ""){
@@ -848,41 +975,68 @@ void write_expression(expression* exp,bool first, ofstream& outFile){
         }
         int var_offset = var_map[exp->id];
         write_expression(exp->next_exp, true, outFile);
-        //not executed
+       
         outFile<<"movq \%rax, "<<var_offset<<"(\%rbp)"<<endl;
         return;
     }
-    write_logic_or(exp->logic, true, outFile);   
+    else{
+        write_conditional_exp(exp->cond, outFile);
+    }
+    
 }
 void write_statement(Statement* stat, int indent, ofstream& outFile){
-    if(!stat || !stat->active){
+    if(!stat){
         return;
     }
-    if(stat->isDeclaration){
-        //se la variabile esiste già
-        if(var_map.find(stat->id) != var_map.end()){
+    if(stat->isIf){
+        write_expression(stat->exp, true, outFile);
+        outFile<<"cmpq $0, %rax"<<endl;
+        
+        string labelElse = generate_label("else");
+        outFile<<"je "<<labelElse<<endl;
+        write_statement(stat->first_if, 0, outFile);
+        string post = generate_label("post");
+        outFile<<"jmp " <<post<<endl;
+        outFile<<labelElse<<":"<<endl;
+        if(stat->second_if){
+            write_statement(stat->second_if, 0, outFile);
+        }
+        outFile<<post<<":"<<endl;
+    }
+    else{
+        write_expression(stat->exp,true, outFile);
+    }
+   
+}
+
+void write_decl(Declaration* decl, ofstream& outFile){
+        if(var_map.find(decl->id) != var_map.end()){
             cerr<<"var già dichiarata"<<endl;
             return;
         }
-        if(stat->exp){
-            write_expression(stat->exp, true, outFile);
+        if(decl->exp){
+            write_expression(decl->exp, true, outFile);
         }
         else{
             outFile<<"movq $0, \%rax"<<endl;
         }
         outFile<<"push \%rax"<<endl;
         stackIndex -= 8;
-        var_map[stat->id] = stackIndex;
-        
-    }
-    else{
-        write_expression(stat->exp,true, outFile);
-    }
-    if(stat->next_statement){
-        write_statement(stat->next_statement, 1, outFile);
-    }
+        var_map[decl->id] = stackIndex;
 }
 
+
+void write_block(BlockItem* block, ofstream& outFile){
+    if(block->decl){
+        write_decl(block->decl, outFile);
+    }
+    else{
+        write_statement(block->stat, 0, outFile);
+    }
+    if(block->next_blockItem){
+        write_block(block->next_blockItem, outFile);
+    }
+}
 void write_asm(Function* root){
     if(!root){
         return;
@@ -904,7 +1058,7 @@ void write_asm(Function* root){
     outFile<<"push %rbp"<<endl;
     outFile<<"movq %rsp, %rbp"<<endl;
     
-    write_statement(root->statement, indent, outFile);
+    write_block(root->statement, outFile);
     outFile<<"movq %rbp, %rsp"<<endl;
     outFile<<"pop %rbp"<<endl;
     outFile<<"ret"<<endl;

@@ -66,13 +66,19 @@ struct LogicalOrExp{
     LogicalOrExp() : next_or(nullptr), and_exp(nullptr){};
 };
 
-
+struct ConditionalExp{
+    LogicalOrExp* logic;
+    expression* exp;
+    ConditionalExp* cond;
+    ConditionalExp() : logic(nullptr), exp(nullptr), cond(nullptr){};
+};
 
 struct expression{
-    LogicalOrExp* logic;
+    
+    ConditionalExp* cond;
     expression* next_exp;
     string id;
-    expression() : logic(nullptr),next_exp(nullptr),id(""){};
+    expression() : cond(nullptr),next_exp(nullptr),id(""){};
 };
 
 
@@ -85,7 +91,7 @@ struct Statement{
     bool isIf;
     bool active;
     bool isReturn;
-    bool isDeclaration;
+   
     Statement() : active(false),exp(nullptr),next_statement(nullptr),isReturn(false),id(""),isIf(false), first_if(nullptr), second_if(nullptr){};
 
 };
@@ -99,11 +105,12 @@ struct Declaration{
 struct BlockItem{
     Statement* stat;
     Declaration* decl;
-    BlockItem() : stat(nullptr), decl(nullptr){};
+    BlockItem* next_blockItem;
+    BlockItem() : stat(nullptr), decl(nullptr),next_blockItem(nullptr){};
 };
 struct Function{
     string name;
-    Statement* statement;
+    BlockItem* statement;
     bool active;
     Function() : active(false),statement(nullptr){};
 };
