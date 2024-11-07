@@ -6,6 +6,7 @@
 using namespace std;
 
 struct expression;
+struct BlockItem;
 std::string alphabet = "abcdefghjkilmnopqrstuwyxvzABCDEFGHJKILMNOPQRSTUWYXVZ";
 std::string numbers = "0123456789";
 
@@ -87,12 +88,13 @@ struct Statement{
     Statement* next_statement;
     Statement* first_if;
     Statement* second_if;
+    BlockItem* block;
     string id;
     bool isIf;
     bool active;
     bool isReturn;
    
-    Statement() : active(false),exp(nullptr),next_statement(nullptr),isReturn(false),id(""),isIf(false), first_if(nullptr), second_if(nullptr){};
+    Statement() : active(false),exp(nullptr),next_statement(nullptr),isReturn(false),id(""),isIf(false), first_if(nullptr), second_if(nullptr), block(nullptr){};
 
 };
 

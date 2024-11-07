@@ -147,7 +147,7 @@ vector<string> lex(ifstream& myread){
 }
 
 void pprint_expr(expression* exp);
-
+void pprint_block(BlockItem*);
 void pprint_fact(Factor* fact){
     if(fact->exp){
         cout<<"expression inside factor"<<endl;
@@ -169,6 +169,9 @@ void pprint_fact(Factor* fact){
     }
 
 }
+
+
+
 
 void pprint_term(Term* term){
     if(term->op != 'Z')   
@@ -297,8 +300,12 @@ void pprint_statement(Statement* stat){
 
         }
     }
+    else if(stat->block){
+        cout<<"COMPOUND STAT"<<endl;
+        pprint_block(stat->block);
+    }
     
-    if(stat->isReturn){
+    else if(stat->isReturn){
         cout<<"RETURN";
         pprint_expr(stat->exp);
     }
@@ -351,8 +358,7 @@ void pretty_printer(Function* root){
 
 
 expression* parse_expression(vector<string> tokenList, int& startIndex);
-
-
+BlockItem* parse_blockItem(vector<string> tokenList, int& startIndex);
 /**
  * @brief parses a token to see if its an unary operator. returns Z if fails.
  */
@@ -639,6 +645,30 @@ Statement* parse_statement(vector<string> tokenList, int& startIndex){
         
         return stat;
     }
+    if(tokenList[startIndex] == "{"){
+        startIndex++;
+        BlockItem* block = new BlockItem; 
+        block= parse_blockItem(tokenList, startIndex);
+        stat->block = block;
+        startIndex++;
+        //should put this in blockItem(?)
+        while(tokenList[startIndex] != "}"){
+            
+            block = parse_blockItem(tokenList, startIndex);
+            startIndex++;
+            if(!stat->block->next_blockItem){
+                stat->block->next_blockItem = block;
+            }
+            else{
+                BlockItem* aux = stat->block->next_blockItem;
+                while(aux->next_blockItem){
+                    aux = aux->next_blockItem;
+                }
+                aux->next_blockItem = block;
+            }
+        }
+        return stat;
+    }
     
     stat->exp = parse_expression(tokenList, startIndex); 
      
@@ -769,13 +799,12 @@ int auxLabel = 0;
 string generate_label(string type){
     return type + "_" + to_string(auxLabel++); 
 }
-int stackIndex = 0;
-map<std::string, int> var_map;
+;
 
-void write_expression(expression*,bool, ofstream&);
+void write_expression(expression*,bool, ofstream&, map<std::string, int>& var_map, int& stackIndex);
+void write_block(BlockItem*, ofstream&, map<std::string, int>& var_map, int& stackIndex);
 
-
-void write_factor(Factor* fact, ofstream& outFile){
+void write_factor(Factor* fact, ofstream& outFile, map<std::string, int>& var_map, int& stackIndex){
     if(!fact->exp && !fact->next_fact && fact->un_op == 'Z' && fact->id == ""){
         outFile<<"movq $" << fact->value <<", %rax"<<endl;
         return;
@@ -786,10 +815,10 @@ void write_factor(Factor* fact, ofstream& outFile){
     }
 
     if(fact->exp){
-        write_expression(fact->exp,true, outFile);
+        write_expression(fact->exp,true, outFile, var_map, stackIndex);
     }
     if(fact->next_fact){
-        write_factor(fact->next_fact, outFile);
+        write_factor(fact->next_fact, outFile, var_map, stackIndex);
     }
     if(fact->un_op == '-'){
         outFile<<"neg %rax"<<endl;    
@@ -805,8 +834,8 @@ void write_factor(Factor* fact, ofstream& outFile){
     
 }
 
-void write_term(Term* term, ofstream& outFile){
-    write_factor(term->factorList,outFile );
+void write_term(Term* term, ofstream& outFile, map<std::string, int>& var_map, int& stackIndex){
+    write_factor(term->factorList,outFile, var_map, stackIndex);
     if(term->op != 'Z'){
         outFile<<"pop %rcx"<<endl;
     }
@@ -820,13 +849,13 @@ void write_term(Term* term, ofstream& outFile){
     }
     if(term->next_term){
         outFile<<"push %rax"<<endl;
-        write_term(term->next_term, outFile);
+        write_term(term->next_term, outFile, var_map, stackIndex);
     }
 }
 
-void write_additive_exp(AdditiveExp* exp, ofstream& outFile){
+void write_additive_exp(AdditiveExp* exp, ofstream& outFile, map<std::string, int>& var_map, int& stackIndex){
     
-    write_term(exp->term, outFile);
+    write_term(exp->term, outFile, var_map, stackIndex);
     if(exp->op != 'Z'){
         outFile<<"pop %rcx"<<endl;
     }
@@ -839,12 +868,12 @@ void write_additive_exp(AdditiveExp* exp, ofstream& outFile){
     }
     if(exp->next_add){
         outFile<<"push %rax"<<endl;
-        write_additive_exp(exp->next_add, outFile);
+        write_additive_exp(exp->next_add, outFile, var_map, stackIndex);
     }
 
 }
-void write_relational_exp(RelationalExp* rexp, ofstream& outFile){
-    write_additive_exp(rexp->add, outFile);
+void write_relational_exp(RelationalExp* rexp, ofstream& outFile, map<std::string, int>& var_map, int& stackIndex){
+    write_additive_exp(rexp->add, outFile, var_map, stackIndex);
     if(rexp->op != "Z"){
         outFile<<"pop %rcx" << endl;
     }
@@ -870,14 +899,14 @@ void write_relational_exp(RelationalExp* rexp, ofstream& outFile){
     }
 
     if(rexp->next_rel){
-        write_relational_exp(rexp->next_rel, outFile);
+        write_relational_exp(rexp->next_rel, outFile, var_map, stackIndex);
     }
 
 }
 
 
-void write_equality_exp(EqualityExp* eexp, ofstream& outFile){
-    write_relational_exp(eexp->rel, outFile);
+void write_equality_exp(EqualityExp* eexp, ofstream& outFile, map<std::string, int> var_map, int& stackIndex){
+    write_relational_exp(eexp->rel, outFile, var_map, stackIndex);
     if(eexp->op != 'Z'){
         outFile<<"pop %rcx"<<endl;
     }
@@ -893,14 +922,14 @@ void write_equality_exp(EqualityExp* eexp, ofstream& outFile){
     }
     if(eexp->next_eq){
         outFile<<"push %rax"<<endl;
-        write_equality_exp(eexp->next_eq, outFile);
+        write_equality_exp(eexp->next_eq, outFile, var_map, stackIndex);
     }
 
 }
 
 string labelEndAnd;
-void write_logic_and(LogicalExp* lexp,bool first, ofstream& outFile){
-    write_equality_exp(lexp->equal, outFile);
+void write_logic_and(LogicalExp* lexp,bool first, ofstream& outFile, map<std::string, int>& var_map, int& stackIndex){
+    write_equality_exp(lexp->equal, outFile, var_map, stackIndex);
     if(first && lexp->next_log){
         outFile<< "cmpq $0, %rax"<<endl;
         string label = generate_label("clause");
@@ -919,13 +948,13 @@ void write_logic_and(LogicalExp* lexp,bool first, ofstream& outFile){
 
     if(lexp->next_log){
         
-        write_logic_and(lexp->next_log, !first, outFile);
+        write_logic_and(lexp->next_log, !first, outFile, var_map, stackIndex);
     }
 }
 string labelEndOr;
 
-void write_logic_or(LogicalOrExp* exp, bool first, ofstream& outFile){
-    write_logic_and(exp->and_exp,true, outFile);
+void write_logic_or(LogicalOrExp* exp, bool first, ofstream& outFile, map<std::string, int>& var_map, int& stackIndex){
+    write_logic_and(exp->and_exp,true, outFile, var_map, stackIndex);
     if(first && exp->next_or){
         outFile<< "cmpq $0, %rax"<<endl;
         string label = generate_label("clause");
@@ -945,27 +974,27 @@ void write_logic_or(LogicalOrExp* exp, bool first, ofstream& outFile){
     
     if(exp->next_or){
        
-        write_logic_or(exp->next_or,!first, outFile);
+        write_logic_or(exp->next_or,!first, outFile, var_map, stackIndex);
     }
 }
 
-void write_conditional_exp(ConditionalExp* cond, ofstream& outFile){
-    write_logic_or(cond->logic, true, outFile);
+void write_conditional_exp(ConditionalExp* cond, ofstream& outFile, map<std::string, int>& var_map, int& stackIndex){
+    write_logic_or(cond->logic, true, outFile, var_map, stackIndex);
     if(cond->exp){
         outFile<<"cmpq $0, %rax"<<endl;
         string lab = generate_label("e");
         outFile<<"je "<< lab<<endl;
-        write_expression(cond->exp, true, outFile);
+        write_expression(cond->exp, true, outFile, var_map, stackIndex);
         string post = generate_label("post_conditional");
         outFile<<"jmp "<<post<<endl;
 
         outFile<<lab<<":"<<endl;
-        write_conditional_exp(cond->cond, outFile);
+        write_conditional_exp(cond->cond, outFile, var_map, stackIndex);
         outFile<<post<<":"<<endl;
     }
 }
 
-void write_expression(expression* exp,bool first, ofstream& outFile){
+void write_expression(expression* exp,bool first, ofstream& outFile, map<std::string, int>& var_map, int& stackIndex){
 
     if(exp->id != ""){
         if(var_map.find(exp->id) == var_map.end()){
@@ -973,48 +1002,54 @@ void write_expression(expression* exp,bool first, ofstream& outFile){
             return;
         }
         int var_offset = var_map[exp->id];
-        write_expression(exp->next_exp, true, outFile);
+        write_expression(exp->next_exp, true, outFile, var_map, stackIndex);
        
         outFile<<"movq \%rax, "<<var_offset<<"(\%rbp)"<<endl;
         return;
     }
     else{
-        write_conditional_exp(exp->cond, outFile);
+        write_conditional_exp(exp->cond, outFile, var_map, stackIndex);
     }
     
 }
-void write_statement(Statement* stat, int indent, ofstream& outFile){
+void write_statement(Statement* stat, int indent, ofstream& outFile, map<std::string, int>& var_map, int& stackIndex){
     if(!stat){
         return;
     }
     if(stat->isIf){
-        write_expression(stat->exp, true, outFile);
+        write_expression(stat->exp, true, outFile, var_map, stackIndex);
         outFile<<"cmpq $0, %rax"<<endl;
         
         string labelElse = generate_label("else");
         outFile<<"je "<<labelElse<<endl;
-        write_statement(stat->first_if, 0, outFile);
+        write_statement(stat->first_if, 0, outFile, var_map, stackIndex);
         string post = generate_label("post");
         outFile<<"jmp " <<post<<endl;
         outFile<<labelElse<<":"<<endl;
         if(stat->second_if){
-            write_statement(stat->second_if, 0, outFile);
+            write_statement(stat->second_if, 0, outFile, var_map, stackIndex);
         }
         outFile<<post<<":"<<endl;
     }
+    else if(stat->block){
+        //new block: have to take care of the variables
+        //should: duplicate var map, create a current_set of allocated variables
+        //should I also duplicate stackIndex? I don't think so
+        ;
+    }
     else{
-        write_expression(stat->exp,true, outFile);
+        write_expression(stat->exp,true, outFile, var_map, stackIndex);
     }
    
 }
 
-void write_decl(Declaration* decl, ofstream& outFile){
+void write_decl(Declaration* decl, ofstream& outFile, map<std::string, int>& var_map, int& stackIndex){
         if(var_map.find(decl->id) != var_map.end()){
             cerr<<"var già dichiarata"<<endl;
             return;
         }
         if(decl->exp){
-            write_expression(decl->exp, true, outFile);
+            write_expression(decl->exp, true, outFile, var_map, stackIndex);
         }
         else{
             outFile<<"movq $0, \%rax"<<endl;
@@ -1025,15 +1060,15 @@ void write_decl(Declaration* decl, ofstream& outFile){
 }
 
 
-void write_block(BlockItem* block, ofstream& outFile){
+void write_block(BlockItem* block, ofstream& outFile, map<std::string, int>& var_map, int& stackIndex){
     if(block->decl){
-        write_decl(block->decl, outFile);
+        write_decl(block->decl, outFile, var_map, stackIndex);
     }
     else{
-        write_statement(block->stat, 0, outFile);
+        write_statement(block->stat, 0, outFile, var_map, stackIndex);
     }
     if(block->next_blockItem){
-        write_block(block->next_blockItem, outFile);
+        write_block(block->next_blockItem, outFile, var_map, stackIndex);
     }
 }
 void write_asm(Function* root){
@@ -1049,6 +1084,9 @@ void write_asm(Function* root){
         std::cerr << "Error opening file for writing" << std::endl;
         return;
     }
+    int stackIndex = 0;
+    map<std::string, int> var_map;
+
     //this writes .global _<function name>
     outFile<<" .global " << root->name<<endl;
     outFile<<root->name<<":"<<endl;
@@ -1057,7 +1095,7 @@ void write_asm(Function* root){
     outFile<<"push %rbp"<<endl;
     outFile<<"movq %rsp, %rbp"<<endl;
     
-    write_block(root->statement, outFile);
+    write_block(root->statement, outFile, var_map, stackIndex);
     outFile<<"movq %rbp, %rsp"<<endl;
     outFile<<"pop %rbp"<<endl;
     outFile<<"ret"<<endl;
@@ -1093,8 +1131,8 @@ int main(int argc, char *argv[]){
         return EXIT_FAILURE;
     }
     pretty_printer(root);
-    write_asm(root);
-    system("g++ -g -O0 out.s -o out");
+    //write_asm(root);
+    //system("g++ -g -O0 out.s -o out");
     return 0;
 }
 
