@@ -4,6 +4,7 @@
 #include <stdlib.h> 
 #include "compiler.h"
 #include <map>
+#include <set>
 using namespace std;
 
 vector<string> lex(ifstream& myread){
@@ -634,9 +635,6 @@ Statement* parse_statement(vector<string> tokenList, int& startIndex){
         startIndex++;
       
         stat->first_if = parse_statement(tokenList, startIndex);
-        if(tokenList[startIndex] != ";"){
-            return nullptr;
-        }
         startIndex++;
         if(tokenList[startIndex] == "else"){
             startIndex++;
@@ -709,7 +707,10 @@ Declaration* parse_declaration(vector<string> tokenList, int& startIndex){
 
 BlockItem* parse_blockItem(vector<string> tokenList, int& startIndex){
     BlockItem* bl = new BlockItem;
-    if(tokenList[startIndex] == "INT_KW"){
+    if(tokenList[startIndex] == "INT_KW" || tokenList[startIndex - 1] == "INT_KW"){
+        if(tokenList[startIndex - 1] == "INT_KW"){
+            startIndex--;
+        }
         bl->decl = parse_declaration(tokenList, startIndex);
     }
     else{
@@ -802,7 +803,7 @@ string generate_label(string type){
 ;
 
 void write_expression(expression*,bool, ofstream&, map<std::string, int>& var_map, int& stackIndex);
-void write_block(BlockItem*, ofstream&, map<std::string, int>& var_map, int& stackIndex);
+void write_block(BlockItem*, ofstream&, map<std::string, int>& var_map, int& stackIndex, set<string>& current_set);
 
 void write_factor(Factor* fact, ofstream& outFile, map<std::string, int>& var_map, int& stackIndex){
     if(!fact->exp && !fact->next_fact && fact->un_op == 'Z' && fact->id == ""){
@@ -811,6 +812,10 @@ void write_factor(Factor* fact, ofstream& outFile, map<std::string, int>& var_ma
     }
     else if(fact->id != ""){
         int var_offset = var_map[fact->id];
+        if(var_offset == 0){
+            cerr<<"ERROR: undeclared variable"<<endl;
+            exit(0);
+        }
         outFile<<"movq "<<var_offset<<"(\%rbp), \%rax"<<endl;
     }
 
@@ -1033,18 +1038,29 @@ void write_statement(Statement* stat, int indent, ofstream& outFile, map<std::st
     }
     else if(stat->block){
         //new block: have to take care of the variables
-        //should: duplicate var map, create a current_set of allocated variables
-        //should I also duplicate stackIndex? I don't think so
-        ;
+        //should: duplicate var map, create a current_set of allocated variables in the block only
+        std::set<string> current_set;
+        map<string, int> new_map(var_map);
+        int new_index = stackIndex;
+        write_block(stat->block, outFile, new_map, new_index, current_set);
+        //end of block: deallocating variables
+        int to_dealloc = current_set.size() * 8;
+        outFile<<"addq $" <<to_dealloc<<", %rsp"<<endl;
+
     }
     else{
         write_expression(stat->exp,true, outFile, var_map, stackIndex);
+        if(stat->isReturn){
+           outFile<<"movq %rbp, %rsp"<<endl;
+            outFile<<"pop %rbp"<<endl;
+            outFile<<"ret"<<endl;
+        }
     }
    
 }
 
-void write_decl(Declaration* decl, ofstream& outFile, map<std::string, int>& var_map, int& stackIndex){
-        if(var_map.find(decl->id) != var_map.end()){
+void write_decl(Declaration* decl, ofstream& outFile, map<std::string, int>& var_map, int& stackIndex, std::set<string>& current_set){
+        if(current_set.find(decl->id) != current_set.end()){
             cerr<<"var già dichiarata"<<endl;
             return;
         }
@@ -1056,19 +1072,20 @@ void write_decl(Declaration* decl, ofstream& outFile, map<std::string, int>& var
         }
         outFile<<"push \%rax"<<endl;
         stackIndex -= 8;
+        current_set.insert(decl->id);
         var_map[decl->id] = stackIndex;
 }
 
 
-void write_block(BlockItem* block, ofstream& outFile, map<std::string, int>& var_map, int& stackIndex){
+void write_block(BlockItem* block, ofstream& outFile, map<std::string, int>& var_map, int& stackIndex, std::set<string>& current_set){
     if(block->decl){
-        write_decl(block->decl, outFile, var_map, stackIndex);
+        write_decl(block->decl, outFile, var_map, stackIndex, current_set);
     }
     else{
         write_statement(block->stat, 0, outFile, var_map, stackIndex);
     }
     if(block->next_blockItem){
-        write_block(block->next_blockItem, outFile, var_map, stackIndex);
+        write_block(block->next_blockItem, outFile, var_map, stackIndex, current_set);
     }
 }
 void write_asm(Function* root){
@@ -1086,7 +1103,7 @@ void write_asm(Function* root){
     }
     int stackIndex = 0;
     map<std::string, int> var_map;
-
+    set<string> current_set;
     //this writes .global _<function name>
     outFile<<" .global " << root->name<<endl;
     outFile<<root->name<<":"<<endl;
@@ -1095,7 +1112,7 @@ void write_asm(Function* root){
     outFile<<"push %rbp"<<endl;
     outFile<<"movq %rsp, %rbp"<<endl;
     
-    write_block(root->statement, outFile, var_map, stackIndex);
+    write_block(root->statement, outFile, var_map, stackIndex, current_set);
     outFile<<"movq %rbp, %rsp"<<endl;
     outFile<<"pop %rbp"<<endl;
     outFile<<"ret"<<endl;
@@ -1131,8 +1148,8 @@ int main(int argc, char *argv[]){
         return EXIT_FAILURE;
     }
     pretty_printer(root);
-    //write_asm(root);
-    //system("g++ -g -O0 out.s -o out");
+    write_asm(root);
+    system("g++ -g -O0 out.s -o out");
     return 0;
 }
 

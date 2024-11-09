@@ -1,13 +1,8 @@
 int main(){
-    {
+    if(1){
         int a;
-        int b;
     }
-    {
-        int c;
-        {
-            1 + 2;
-            1 + 3;
-        }
-    }
+    int b;
+    b = 5;
+    return 1;
 }
