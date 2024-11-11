@@ -1,3 +1,5 @@
+#ifndef COMPILER_H
+
 #include <iostream>
 #include <fstream>
 #include <vector>
@@ -116,3 +118,4 @@ struct Function{
     bool active;
     Function() : active(false),statement(nullptr){};
 };
+#endif

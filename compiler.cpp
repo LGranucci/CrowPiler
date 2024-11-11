@@ -360,6 +360,9 @@ void pretty_printer(Function* root){
 
 expression* parse_expression(vector<string> tokenList, int& startIndex);
 BlockItem* parse_blockItem(vector<string> tokenList, int& startIndex);
+//Regola: lo startIndex finisce sull'ultimo carattere della cosa parsata
+//si entra in una funzione con lo startIndex rilevante
+
 /**
  * @brief parses a token to see if its an unary operator. returns Z if fails.
  */
@@ -635,9 +638,8 @@ Statement* parse_statement(vector<string> tokenList, int& startIndex){
         startIndex++;
       
         stat->first_if = parse_statement(tokenList, startIndex);
-        startIndex++;
-        if(tokenList[startIndex] == "else"){
-            startIndex++;
+        if(tokenList[startIndex + 1] == "else"){
+            startIndex += 2;
             stat->second_if = parse_statement(tokenList, startIndex); 
         }
         
@@ -649,7 +651,7 @@ Statement* parse_statement(vector<string> tokenList, int& startIndex){
         block= parse_blockItem(tokenList, startIndex);
         stat->block = block;
         startIndex++;
-        //should put this in blockItem(?)
+      
         while(tokenList[startIndex] != "}"){
             
             block = parse_blockItem(tokenList, startIndex);
@@ -670,19 +672,15 @@ Statement* parse_statement(vector<string> tokenList, int& startIndex){
     
     stat->exp = parse_expression(tokenList, startIndex); 
      
-    if(tokenList[startIndex + 1] != ";" && tokenList[startIndex] != ";"){
-        return nullptr;
+    if(tokenList[startIndex +1] != ";"){
+        cout<<"column in wrong position in STATEMENT"<<endl;
     }
-    if(tokenList[startIndex + 1] == ";"){
-        startIndex++;
-    }
-    
+    startIndex++;
     stat->active = true;
     return stat;
 }
 Declaration* parse_declaration(vector<string> tokenList, int& startIndex){
     Declaration* dec = new Declaration;
-    startIndex++;
         
         //for now I just assume it is a valid name
     dec->id = tokenList[startIndex];
@@ -695,22 +693,18 @@ Declaration* parse_declaration(vector<string> tokenList, int& startIndex){
     }
     startIndex+= 2;
     dec->exp = parse_expression(tokenList, startIndex);
-     if(tokenList[startIndex + 1] != ";" && tokenList[startIndex] != ";"){
-        return nullptr;
+    if(tokenList[startIndex + 1] != ";"){
+        cout<<"Errore con il punto e virgola"<<endl;    
     }
-    if(tokenList[startIndex + 1] == ";"){
-        startIndex++;
-    }
+    startIndex++;
     return dec;
 }
 
 
 BlockItem* parse_blockItem(vector<string> tokenList, int& startIndex){
     BlockItem* bl = new BlockItem;
-    if(tokenList[startIndex] == "INT_KW" || tokenList[startIndex - 1] == "INT_KW"){
-        if(tokenList[startIndex - 1] == "INT_KW"){
-            startIndex--;
-        }
+    if(tokenList[startIndex] == "INT_KW"){
+        startIndex++;
         bl->decl = parse_declaration(tokenList, startIndex);
     }
     else{

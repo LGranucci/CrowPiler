@@ -1,10 +1,10 @@
 int main(){
-    if(1){
-        int a;
+    int a = 2;
+    if(a == 1){
         a = 5;
     }
-    int b = 6;
-    b = 6 * 8 / 4;
-    b = 5;
-    return 1;
+    else{
+        a = 66;
+    }
+    return a;
 }
