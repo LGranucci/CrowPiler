@@ -1149,7 +1149,7 @@ int main(int argc, char *argv[]){
     }
     pretty_printer(root);
     write_asm(root);
-    system("g++ -g -O0 out.s -o out");
+    system("g++ -g -z noexecstack -O0 out.s -o out");
     return 0;
 }
 
