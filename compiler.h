@@ -1,18 +1,15 @@
 #ifndef COMPILER_H
-
+#define COMPILER_H
 #include <iostream>
 #include <fstream>
 #include <vector>
 #include <stdlib.h> 
-
+#include <map>
+#include <set>
 using namespace std;
 
 struct expression;
 struct BlockItem;
-std::string alphabet = "abcdefghjkilmnopqrstuwyxvzABCDEFGHJKILMNOPQRSTUWYXVZ";
-std::string numbers = "0123456789";
-
-
 struct Constant{
     int val;
     bool active;
@@ -118,4 +115,12 @@ struct Function{
     bool active;
     Function() : active(false),statement(nullptr){};
 };
+
+
+void pretty_printer(Function* root);
+void write_asm(Function* root);
+vector<string> lex(ifstream&);
+Function* parse(vector<string>);
+void pprint_statement(Statement*);
+
 #endif

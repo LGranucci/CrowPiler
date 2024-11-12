@@ -1,5 +1,5 @@
 all:
-	g++ -g compiler.cpp  compiler.h -o lexer
+	g++ -g parser.cpp main.cpp lexer.cpp write.cpp -o lexer
 
 clean:
 	rm lexer
