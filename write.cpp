@@ -118,6 +118,7 @@ void write_relational_exp(RelationalExp* rexp, ofstream& outFile, map<std::strin
     }
 
     if(rexp->next_rel){
+        outFile<<"push %rax"<<endl;
         write_relational_exp(rexp->next_rel, outFile, var_map, stackIndex);
     }
 
@@ -214,7 +215,9 @@ void write_conditional_exp(ConditionalExp* cond, ofstream& outFile, map<std::str
 }
 
 void write_expression(expression* exp,bool first, ofstream& outFile, map<std::string, int>& var_map, int& stackIndex){
-
+    if(exp->isNull){
+        return;
+    }
     if(exp->id != ""){
         if(var_map.find(exp->id) == var_map.end()){
             cerr<<"variabile non dichiarata"<<endl;
@@ -249,6 +252,26 @@ void write_statement(Statement* stat, int indent, ofstream& outFile, map<std::st
             write_statement(stat->second_if, 0, outFile, var_map, stackIndex);
         }
         outFile<<post<<":"<<endl;
+    }
+    else if(stat->isWhile){
+        string startWhile = generate_label("start_while");
+        outFile<<startWhile<<":"<<endl;
+        write_expression(stat->exp, true, outFile, var_map, stackIndex);
+        outFile<<"cmpq $0, %rax"<<endl;
+        string labelWhile = generate_label("while");
+        outFile<<"je "<<labelWhile<<endl;
+        write_statement(stat->next_statement, true, outFile, var_map, stackIndex);
+        outFile<<"jmp "<<startWhile<<";"<<endl;
+        outFile<<labelWhile<<":"<<endl;
+        
+    }
+    else if(stat->isDo){
+        string startWhile = generate_label("start_while");
+        outFile<<startWhile<<":"<<endl;
+        write_statement(stat->next_statement, 0, outFile, var_map, stackIndex);
+        write_expression(stat->exp, true, outFile, var_map, stackIndex);
+        outFile<<"cmpq $0, %rax"<<endl;
+        outFile<<"jne "<<startWhile<<endl;
     }
     else if(stat->block){
         //new block: have to take care of the variables

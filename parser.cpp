@@ -449,7 +449,10 @@ ConditionalExp* parse_conditional(vector<string> tokenList, int& startIndex){
 expression* parse_expression(vector<string> tokenList, int& startIndex){
     //se sono arrivato ad un integer
     expression* exp = new expression;
-    
+    if(tokenList[startIndex] == ";"){
+        exp->isNull = true;
+        return exp;
+    }
     if(tokenList.size() >= startIndex + 1 && tokenList[startIndex + 1] == "="){
         exp->id = tokenList[startIndex];
         startIndex += 2;
@@ -462,6 +465,7 @@ expression* parse_expression(vector<string> tokenList, int& startIndex){
     return exp;
     
 }
+Declaration* parse_declaration(vector<string> tokenList, int& startIndex);
 /**
  * @brief parses a statement, which (for now) can only be of type `return <operation>`
  * @param tokenList list of tokens that the lexer produced
@@ -501,6 +505,101 @@ Statement* parse_statement(vector<string> tokenList, int& startIndex){
         
         return stat;
     }
+    if(tokenList[startIndex] == "continue"){
+        stat->isContinue = true;
+        startIndex++;
+        if(tokenList[startIndex] != ";"){
+            cout<<"column in wrong position in STATEMENT"<<endl;
+        }
+        return stat;
+    }
+    if(tokenList[startIndex] == "break"){
+        stat->isBreak = true;
+        startIndex++;
+        if(tokenList[startIndex] != ";"){
+            cout<<"column wrong STAT"<<endl;
+        }
+        return stat;
+    }
+    if(tokenList[startIndex] == ";"){
+        stat->isNull = true;
+        return stat;
+    }
+    if(tokenList[startIndex] == "for"){
+        startIndex++;
+        if(tokenList[startIndex] != "(" ){
+            cout<<"syntax error in for"<<endl;
+        }
+        stat->isFor = true;
+        startIndex++;
+        if(tokenList[startIndex] == "INT_KW"){
+            startIndex++;
+            stat->for_decl = parse_declaration(tokenList, startIndex);
+            startIndex++;
+        }
+        else{
+            stat->exp = parse_expression(tokenList, startIndex);
+            startIndex++;
+            if(tokenList[startIndex] != ";"){
+                cout<<"; in wrong pos"<<endl;
+            }
+            startIndex++;
+        }
+        stat->exp2_for = parse_expression(tokenList, startIndex);
+        startIndex++;
+        if(tokenList[startIndex] != ";"){
+            cout<<"; in wrong position"<<endl;
+        }
+        startIndex++;
+        stat->exp3_for = parse_expression(tokenList, startIndex);
+        startIndex++;
+        if(tokenList[startIndex] != ")"){
+            cout<<"no closing bracket in for"<<endl;
+        }
+        startIndex++;
+        stat->next_statement = parse_statement(tokenList, startIndex);
+        return stat;
+    }
+    if(tokenList[startIndex] == "while"){
+        stat->isWhile = true;
+        startIndex++;
+        if(tokenList[startIndex] != "("){
+            cout<<"no opening bracket in while"<<endl;
+        }
+        startIndex++;
+        stat->exp = parse_expression(tokenList, startIndex);
+        startIndex++;
+        if(tokenList[startIndex] != ")"){
+            cout<<"no closing bracket"<<endl;
+        }
+        startIndex++;
+        stat->next_statement = parse_statement(tokenList, startIndex);
+        return stat;
+    }
+    if(tokenList[startIndex] == "do"){
+        stat->isDo = true;
+        startIndex++;
+        stat->next_statement = parse_statement(tokenList, startIndex);
+        startIndex++;
+        if(tokenList[startIndex] != "while"){
+            cout<<"error in do"<<endl;
+        }
+        startIndex++;
+        if(tokenList[startIndex] != "("){
+            cout<<"missing opening bracket"<<endl;
+        }
+        startIndex++;
+        stat->exp = parse_expression(tokenList, startIndex);
+        startIndex++;
+        if(tokenList[startIndex] != ")"){
+            cout<<"missing closing bracket";
+        }
+        startIndex++;
+        if(tokenList[startIndex] != ";"){
+            cout<<"missing ; in while"<<endl;
+        }
+        return stat;
+    }
     if(tokenList[startIndex] == "{"){
         startIndex++;
         BlockItem* block = new BlockItem; 
@@ -525,6 +624,7 @@ Statement* parse_statement(vector<string> tokenList, int& startIndex){
         }
         return stat;
     }
+    
     
     stat->exp = parse_expression(tokenList, startIndex); 
      

@@ -78,23 +78,31 @@ struct expression{
     ConditionalExp* cond;
     expression* next_exp;
     string id;
-    expression() : cond(nullptr),next_exp(nullptr),id(""){};
+    bool isNull;
+    expression() : cond(nullptr),next_exp(nullptr),id(""), isNull(false){};
 };
-
+struct Declaration;
 
 struct Statement{
-    expression* exp;
-    Statement* next_statement;
-    Statement* first_if;
-    Statement* second_if;
-    BlockItem* block;
-    string id;
-    bool isIf;
-    bool active;
-    bool isReturn;
-   
-    Statement() : active(false),exp(nullptr),next_statement(nullptr),isReturn(false),id(""),isIf(false), first_if(nullptr), second_if(nullptr), block(nullptr){};
-
+    expression* exp = nullptr;
+    expression* exp2_for = nullptr;
+    expression* exp3_for = nullptr;
+    Statement* next_statement = nullptr;
+    Statement* first_if = nullptr;
+    Statement* second_if = nullptr;
+    BlockItem* block = nullptr;
+    string id = "";
+    Declaration* for_decl = nullptr;
+    bool isFor = false;
+    bool isWhile = false;
+    bool isBreak = false;
+    bool isContinue = false;
+    bool isDo = false;
+    bool isIf = false;
+    bool active = false;
+    bool isReturn = false;
+    bool isNull = false;
+    
 };
 
 struct Declaration{
