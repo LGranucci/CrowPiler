@@ -125,6 +125,10 @@ void pprint_cond(ConditionalExp* cond){
 
 void pprint_expr(expression* exp){
     cout<<"EXPRESSION ";
+    if(exp->isNull){
+        cout<<"NULL exp"<<endl;
+        return;
+    }
     if(exp->id != ""){
         cout<<exp->id;
         if(!exp->next_exp){
@@ -138,7 +142,7 @@ void pprint_expr(expression* exp){
 }
 
 void pprint_statement(Statement* stat){
-    cout<<"STATMENT";
+    cout<<"STATMENT ";
     if(stat->isIf){
         cout<<"IF";
         if(!stat->exp){
@@ -156,6 +160,10 @@ void pprint_statement(Statement* stat){
             pprint_statement(stat->second_if);
 
         }
+    }
+    else if(stat->isFor){
+        cout<<"for detected" <<endl;
+
     }
     else if(stat->block){
         cout<<"COMPOUND STAT"<<endl;
@@ -479,7 +487,10 @@ Statement* parse_statement(vector<string> tokenList, int& startIndex){
 
     Statement* stat = new Statement;
     stat->isReturn = false;
-    
+    if(tokenList[startIndex] == ";"){
+        stat->exp = parse_expression(tokenList, startIndex);
+        return stat;
+    }
     if(tokenList[startIndex] == "RETURN_KW"){
         startIndex++;
         stat->isReturn = true;
@@ -624,8 +635,6 @@ Statement* parse_statement(vector<string> tokenList, int& startIndex){
         }
         return stat;
     }
-    
-    
     stat->exp = parse_expression(tokenList, startIndex); 
      
     if(tokenList[startIndex +1] != ";"){

@@ -234,6 +234,10 @@ void write_expression(expression* exp,bool first, ofstream& outFile, map<std::st
     }
     
 }
+void write_decl(Declaration* decl, ofstream& outFile, map<std::string, int>& var_map, int& stackIndex, std::set<string>& current_set);
+
+
+
 void write_statement(Statement* stat, int indent, ofstream& outFile, map<std::string, int>& var_map, int& stackIndex){
     if(!stat){
         return;
@@ -272,6 +276,35 @@ void write_statement(Statement* stat, int indent, ofstream& outFile, map<std::st
         write_expression(stat->exp, true, outFile, var_map, stackIndex);
         outFile<<"cmpq $0, %rax"<<endl;
         outFile<<"jne "<<startWhile<<endl;
+    }
+    else if(stat->isFor){
+        //still have to make start of for a new block
+        std::set<string> current_set;
+        map<string, int> new_map(var_map);
+        int new_index = stackIndex;
+
+        if(stat->for_decl){
+            write_decl(stat->for_decl, outFile, new_map, new_index, current_set);
+        }
+        else{
+            write_expression(stat->exp, true, outFile, new_map, new_index);
+        }
+        string startFor = generate_label("start_for");
+        outFile<<startFor<<":"<<endl;
+        
+        write_expression(stat->exp2_for, true, outFile, new_map, new_index);
+        string endFor = generate_label("end_for");
+        outFile<<"cmpq $0, %rax"<<endl;
+        outFile<<"je "<<endFor<<endl;
+        write_statement(stat->next_statement, 0, outFile, new_map,  new_index);
+        write_expression(stat->exp3_for, true, outFile, new_map, new_index);
+        outFile<<"jmp " << startFor<<endl;
+        outFile<<endFor<<":"<<endl;
+        
+        
+        int to_dealloc = current_set.size() * 8;
+        outFile<<"addq $" <<to_dealloc<<", %rsp"<<endl;
+
     }
     else if(stat->block){
         //new block: have to take care of the variables
