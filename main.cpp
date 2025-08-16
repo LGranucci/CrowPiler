@@ -30,14 +30,14 @@ int main(int argc, char *argv[]){
     for(int i = 0; i < tokenList.size(); i++){
         cout<<tokenList[i]<<endl;
     }
-    Function* root = parse(tokenList);
+    Program* root = parse_program(tokenList);
     if(!root){
         cout<<"\033[1;31merrore nel parser\033[0m\n";
         return EXIT_FAILURE;
     }
-
-    pretty_printer(root);
-    write_asm(root);
+    Function* func = root->function_list;
+    pretty_printer(func);
+    write_asm(func);
     system("g++ -g -z noexecstack -O0 out.s -o out");
     return 0;
 }

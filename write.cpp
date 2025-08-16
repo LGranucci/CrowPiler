@@ -363,7 +363,7 @@ void write_asm(Function* root){
         return;
     }
     if(!root->active){
-        cout<<"root does not contain a funcition"<<endl;
+        cout<<"root does not contain a function"<<endl;
         return;
     }
     ofstream outFile("out.s");

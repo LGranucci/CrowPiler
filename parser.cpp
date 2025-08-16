@@ -236,13 +236,51 @@ char get_operator(string token){
     }
     else return 'Z';
 }
-
+FunctionCall* parse_function_call(vector<string> tokenList, int& startIndex){
+    FunctionCall* call = new FunctionCall;
+    if(tokenList.size() < startIndex + 1){
+        return nullptr;
+    }
+    call->id = tokenList[startIndex];
+    startIndex++;
+    call->exp = nullptr;
+    if(tokenList[startIndex] != "("){
+        cerr<<"expected ( after function call"<<endl;
+        return nullptr;
+    }
+    while( startIndex + 1 < tokenList.size() && tokenList[startIndex + 1] != ")"){
+        startIndex++;
+        expression* exp = parse_expression(tokenList, startIndex);
+        if(!exp){
+            cerr<<"error parsing expression in function call"<<endl;
+            return nullptr;
+        }
+        if(!call->exp){
+            call->exp = exp;
+        }   
+        else{
+            expression* aux = call->exp;
+            while(aux->next_exp){
+                aux = aux->next_exp;
+            }
+            aux->next_exp = exp;
+        }
+        if(tokenList[startIndex] == ","){
+            startIndex++;
+        }
+        if (tokenList[startIndex] == ")"){
+            return call;
+        }
+    }
+    return call;
+}
 Factor* parse_factor(vector<string> tokenList, int& startIndex){
     Factor* fact = new Factor;
     if(tokenList.size() < startIndex + 1){
         return nullptr;
     }
-    
+    //if function call
+   
     if(tokenList[startIndex][0] == '('){
         startIndex++;
         expression* exp = parse_expression(tokenList, startIndex);
@@ -264,10 +302,19 @@ Factor* parse_factor(vector<string> tokenList, int& startIndex){
     else if(numbers.find(tokenList[startIndex][0]) != string::npos){
         fact->value = stoi(tokenList[startIndex]);
     }
-    else{
+    else if (tokenList[startIndex + 1]  == "("){
         //sto assumendo che qualunque id sia valido
+        FunctionCall* call = parse_function_call(tokenList, startIndex);
+        if(!call){
+            cerr<<"error parsing function call"<<endl;
+            return nullptr;
+        }
+        startIndex++;
+        fact->call = call;
+    }   
+    else{
         fact->id = tokenList[startIndex];
-    } 
+    }
     return fact;
 }
 
@@ -475,7 +522,7 @@ expression* parse_expression(vector<string> tokenList, int& startIndex){
 }
 Declaration* parse_declaration(vector<string> tokenList, int& startIndex);
 /**
- * @brief parses a statement, which (for now) can only be of type `return <operation>`
+ * @brief parses a statement`
  * @param tokenList list of tokens that the lexer produced
  * @param startIndex index that indicates where to start accessing the vector from
  * 
@@ -679,38 +726,65 @@ BlockItem* parse_blockItem(vector<string> tokenList, int& startIndex){
 }
 
 
-Function* parse(vector<string> tokenList){
+Function* parse_function(vector<string> tokenList, int& startIndex){
     
     Function* root = new Function;
-    if(tokenList.size() < 6){
-        cout<<"tokenList too small"<<endl;
-        return nullptr;
-    }
-
-    if(tokenList[0] != "INT_KW"){
+    
+    if(tokenList[startIndex] != "INT_KW"){
         cout<<"function declaration does not start with int"<<endl;
         return nullptr;
     }
-    if((alphabet.find(tokenList[1][0]) == string::npos) || tokenList[1] == "INT_KW" || tokenList[1] == "RETURN_KW"){
+    if((alphabet.find(tokenList[startIndex + 1][0]) == string::npos) || tokenList[1] == "INT_KW" || tokenList[1] == "RETURN_KW"){
         cout<< (alphabet.find(tokenList[1]) == string::npos);
         return nullptr;
     }
-    if(tokenList[2] != "("){
+    if(tokenList[startIndex + 2] != "("){
         cout<<"missing opening bracket"<<endl;
         return nullptr;
     }
-    if(tokenList[3] != ")"){
+    int stop_char = 3;
+    if(tokenList[startIndex + 3] == "INT_KW"){
+        //start parsing parameters
+        int i = startIndex + 3;
+        for(; i < tokenList.size() && tokenList[i] != ")"; i++){
+            ;
+        }
+        if (i == tokenList.size() - 1){
+            cout<<"missing closing bracket"<<endl;
+            return nullptr;
+        }  
+        stop_char = i;
+        root->parameters = new string[stop_char - 4];
+        for(int j = startIndex + 3; j < stop_char; j++){
+            if(tokenList[j] != "INT_KW"){
+                cout<<"parameter is not an int"<<endl;
+                return nullptr;
+            }
+            //assume that the parameter is a valid name
+            root->parameters[j - 3] = tokenList[j + 1];
+            j++;
+            if(tokenList[j] != "," && tokenList[j + 1] != ")"){
+                cout<<"missing comma or closing bracket in parameter list"<<endl;
+                return nullptr;
+            }
+            if (tokenList[j] == ","){
+                j++;
+            }
+        }
+
+    }
+    if(tokenList[stop_char] != ")"){
         cout<<"missing closing bracket"<<endl;
         return nullptr;
     }
-    if(tokenList[4] != "{"){
+    if(tokenList[stop_char + 1] != "{"){
         cout<<"missing openinig curly bracket"<<endl;
         return nullptr;
     }
     
-    root->name = tokenList[1];
+    root->name = tokenList[startIndex + 1];
     root->active = true;
-    int index = 5;
+    int index = stop_char + 2;
     root->statement = parse_blockItem(tokenList, index);
     
     
@@ -742,5 +816,32 @@ Function* parse(vector<string> tokenList){
         cout<<"missing closing bracket"<<endl;
         return nullptr;
     }
+    startIndex = index + 2;
     return root;
+}
+
+
+Program* parse_program(vector<string> tokenList){
+    Program* prog = new Program;
+    int startIndex = 0;
+    while(startIndex < tokenList.size()){
+        Function* func = parse_function(tokenList, startIndex);
+        if(!func){
+            cout<<"error parsing function"<<endl;
+            return nullptr;
+        }
+        if(!prog->function_list){
+            prog->function_list = func;
+        }
+        else{
+            Function* aux = prog->function_list;
+            while(aux->next_function){
+                aux = aux->next_function;
+            }
+            aux->next_function = func;
+            func->next_function = nullptr;
+        }
+        }
+
+    return prog;
 }

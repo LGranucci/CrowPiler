@@ -10,6 +10,7 @@ using namespace std;
 
 struct expression;
 struct BlockItem;
+struct FunctionCall;
 struct Constant{
     int val;
     bool active;
@@ -19,6 +20,7 @@ struct Constant{
 struct Factor{
     expression* exp;
     char un_op;
+    FunctionCall* call;
     Factor* next_fact;
     int value;
     string id;
@@ -30,6 +32,11 @@ struct Term{
     char op;
     Term* next_term;
     Term() : next_term(nullptr),op('Z'){};
+};
+
+struct FunctionCall{
+    string id;
+    expression* exp;
 };
 struct AdditiveExp{
     Term* term;
@@ -83,6 +90,7 @@ struct expression{
 };
 struct Declaration;
 
+ 
 struct Statement{
     expression* exp = nullptr;
     expression* exp2_for = nullptr;
@@ -119,16 +127,22 @@ struct BlockItem{
 };
 struct Function{
     string name;
+    string* parameters;
     BlockItem* statement;
     bool active;
+    Function* next_function;
     Function() : active(false),statement(nullptr){};
+    
 };
-
-
+struct Program{
+    Function* function_list;
+    Program() : function_list(nullptr){};
+};
 void pretty_printer(Function* root);
 void write_asm(Function* root);
 vector<string> lex(ifstream&);
-Function* parse(vector<string>);
+Function* parse(vector<string>, int& startIndex);
+Program* parse_program(vector<string> tokenList);
 void pprint_statement(Statement*);
 
 #endif
